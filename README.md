@@ -43,7 +43,7 @@ com.shop.buyingmvp (최상위 패키지)
 │       ├── dto
 │       └── entity           # 재고 히스토리 엔티티 (StockHistory)
 │
-└── BuyingMvpApplication.java # 메인 스프링부트 실행 클래스
+└── GroomMvpApplication.java # 메인 스프링부트 실행 클래스
 ```
 
 ## 🔀 브랜치 전략 및 협업 가이드
