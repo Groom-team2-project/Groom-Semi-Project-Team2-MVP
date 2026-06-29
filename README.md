@@ -45,3 +45,29 @@ com.shop.buyingmvp (최상위 패키지)
 │
 └── BuyingMvpApplication.java # 메인 스프링부트 실행 클래스
 ```
+
+## 🔀 브랜치 전략 및 협업 가이드
+
+### 1. 브랜치 구조 및 명명 규칙
+
+* **`개인 이름/기능`** : 각자 맡은 MVP 기능을 개발하는 로컬/원격 작업 브랜치입니다.
+  * *예시 (박선우) :* `sunwoo/order-api`
+  * *예시 (노현섭) :* `hyunseop/stock-history`
+  * *예시 (김승진) :* `seungjin/cancel-logic`
+  * *예시 (주정현) :* `junghyun/product-list`
+  * *예시 (박소빈) :* `sobin/product-crud`
+
+---
+
+### 2. 기본 작업 워크플로우 (Workflow)
+
+새로운 기능을 개발할 때는 반드시 아래 순서대로 깃 명령어를 수행해 주세요.
+
+#### ① 로컬 최신화 및 브랜치 생성
+항상 `main` 브랜치의 최신 코드를 기반으로 새로운 작업 브랜치를 만듭니다.
+```bash
+git checkout main
+git pull origin main
+git checkout -b 본인이름/구현기능
+# 예시: git checkout -b sunwoo/order-api
+```
