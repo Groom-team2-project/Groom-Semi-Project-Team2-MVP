@@ -1,0 +1,15 @@
+### 상품 리스트 조회
+GET http://localhost:8080/api/products
+Accept: application/json
+
+### 상품 리스트 페이징 및 정렬 (가격 비싼 순으로 5개만 보기)
+GET http://localhost:8080/api/products?page=0&size=5&sort=productPrice,desc
+Accept: application/json
+
+### 상품 이름으로 검색하기 ('감자' 검색)
+GET http://localhost:8080/api/products?keyword=감자
+Accept: application/json
+
+### 다중 필터 (감자 검색 + 가격 싼 순서 정렬)
+GET http://localhost:8080/api/products?keyword=감자&sort=productPrice,asc
+Accept: application/json
