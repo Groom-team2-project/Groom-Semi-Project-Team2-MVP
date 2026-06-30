@@ -1,5 +1,5 @@
 package org.example.groommvp.domain.product.controller;
 
-public class Controller {
+public class ProductController {
     //jh test
 }
