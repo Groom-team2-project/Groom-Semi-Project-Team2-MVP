@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@Table(name = "product")
+@Table(name = "products")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class ProductEntity {
