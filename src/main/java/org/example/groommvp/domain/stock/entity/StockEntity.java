@@ -76,4 +76,14 @@ public class StockEntity {
         }
         this.stocks += quantity;
     }
+
+    public void decrease(int quantity) {
+        if (quantity <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        if (stocks < quantity) {
+            throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+        }
+        this.stocks -= quantity;
+    }
 }
