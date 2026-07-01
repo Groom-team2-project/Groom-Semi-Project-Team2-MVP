@@ -52,7 +52,7 @@ public class OrderItem {
 
     public OrderItem(Order order, ProductEntity product, int quantity, int orderPrice) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException("Order quantity must be greater than or equal to 1.");
+            throw new IllegalArgumentException("주문 수량은 1 이상이어야 합니다.");
         }
         this.order = order;
         this.product = product;
