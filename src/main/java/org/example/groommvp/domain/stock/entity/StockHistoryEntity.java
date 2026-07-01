@@ -31,8 +31,8 @@ import org.hibernate.annotations.CreationTimestamp;
  *       지금은 nullable {@code Long} 컬럼으로 보관하고, 주문 엔티티가 생기면 연관관계로 승격한다.</li>
  * </ul>
  *
- * <p><b>네이밍 컨벤션:</b> 자바 필드는 camelCase, DB 컬럼은 snake_case 로 자동 변환된다.
- * (예: {@code changeType} → 컬럼 {@code change_type}, {@code changedQty} → {@code changed_qty})
+ * <p><b>네이밍 컨벤션:</b> 자바 필드는 camelCase, DB 컬럼은 snake_case 이며,
+ * 컬럼명은 {@code @Column(name = "...")} 으로 명시한다. (팀 컨벤션)
  */
 @Entity
 @Getter
@@ -42,6 +42,7 @@ public class StockHistoryEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "history_id")
     private Long historyId;
 
     /** 변동이 일어난 재고 (N:1). FK 컬럼은 stock_id. */
@@ -49,23 +50,25 @@ public class StockHistoryEntity {
     @JoinColumn(name = "stock_id", nullable = false)
     private StockEntity stock;
 
-    /** 변동을 유발한 주문 ID (선택). 입고처럼 주문과 무관한 변동은 null. (컬럼: order_id) */
+    /** 변동을 유발한 주문 ID (선택). 입고처럼 주문과 무관한 변동은 null. */
+    @Column(name = "order_id")
     private Long orderId;
 
-    /** 변경 타입 (입고/차감/복구). 증감 방향을 결정한다. (컬럼: change_type) */
+    /** 변경 타입 (입고/차감/복구). 증감 방향을 결정한다. */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "change_type", nullable = false, length = 20)
     private StockHistoryType changeType;
 
     /** 변경 사유 (예: "정기 입고", "주문 출고"). 선택값. */
-    @Column(length = 50)
+    @Column(name = "reason", length = 50)
     private String reason;
 
-    /** 변경 수량 (양수 magnitude). 증가/감소 방향은 {@code changeType} 으로 구분한다. (컬럼: changed_qty) */
-    @Column(nullable = false)
+    /** 변경 수량 (양수 magnitude). 증가/감소 방향은 {@code changeType} 으로 구분한다. */
+    @Column(name = "changed_qty", nullable = false)
     private int changedQty;
 
     @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
