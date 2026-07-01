@@ -25,8 +25,8 @@ import org.hibernate.annotations.UpdateTimestamp;
  *
  * <p>상품 1건당 재고 1건(1:1)이며, FK 컬럼은 {@code product_id}.
  *
- * <p><b>네이밍 컨벤션:</b> 자바 필드는 camelCase, DB 컬럼은 snake_case 로 자동 변환된다.
- * (Hibernate 기본 물리 네이밍 전략 — 예: {@code createdAt} → 컬럼 {@code created_at})
+ * <p><b>네이밍 컨벤션:</b> 자바 필드는 camelCase, DB 컬럼은 snake_case 이며,
+ * 컬럼명은 {@code @Column(name = "...")} 으로 명시한다. (팀 컨벤션)
  */
 @Entity
 @Getter
@@ -36,6 +36,7 @@ public class StockEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "stock_id")
     private Long stockId;
 
     /** 재고가 속한 상품 (1:1). */
@@ -43,14 +44,16 @@ public class StockEntity {
     @JoinColumn(name = "product_id", nullable = false, unique = true)
     private ProductEntity product;
 
-    /** 현재 재고 수량. (컬럼: stocks) */
-    @Column(nullable = false)
+    /** 현재 재고 수량. */
+    @Column(name = "stocks", nullable = false)
     private int stocks;
 
     @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @Builder
