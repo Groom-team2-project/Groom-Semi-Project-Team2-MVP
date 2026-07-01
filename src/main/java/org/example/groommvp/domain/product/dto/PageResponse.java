@@ -9,15 +9,15 @@ import java.util.List;
 @Builder
 
 @JsonPropertyOrder({"content", "page", "size", "totalElements"})
-public class PageResponseDto<T>{
+public class PageResponse<T>{
     private List<T> content;
     private int page;
     private int size;
     private long totalElements;
 
 
-    public static <T> PageResponseDto<T> from(Page<T> page) {
-        return PageResponseDto.<T>builder()
+    public static <T> PageResponse<T> from(Page<T> page) {
+        return PageResponse.<T>builder()
                 .content(page.getContent())
                 .page(page.getNumber())      // 현재 페이지 번호
                 .size(page.getSize())        // 페이지 크기

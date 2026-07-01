@@ -8,14 +8,14 @@ import org.example.groommvp.domain.product.entity.ProductEntity;
 @Getter
 @Builder
 @JsonPropertyOrder({"productId", "productName", "productPrice", "status", "stockQuantity"})
-public class ProductListResponseDto {
+public class ProductListResponse {
     private Long productId;
     private String productName;
     private int productPrice;
     //상품상태 추가 필요
 
-    public static ProductListResponseDto from(ProductEntity product){
-        return ProductListResponseDto.builder()
+    public static ProductListResponse from(ProductEntity product){
+        return ProductListResponse.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
                 .productPrice(product.getProductPrice())
