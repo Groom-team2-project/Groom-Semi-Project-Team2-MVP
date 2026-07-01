@@ -11,17 +11,36 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
+import jakarta.validation.Valid;
+import org.example.groommvp.domain.product.dto.ProductCreateRequest;
+import org.example.groommvp.domain.product.dto.ProductUpdateRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/api/v1/product")
 @RequiredArgsConstructor
 public class ProductController {
+
     private final ProductService productService;
 
+    @PostMapping
+    public ResponseEntity<Void> createProduct(@Valid @RequestBody ProductCreateRequest request) {
+        productService.createProduct(request);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
 
-    // 검색
+    @PutMapping("/{productId}")
+    public ResponseEntity<Void> updateProduct(@PathVariable Long productId,
+                                              @Valid @RequestBody ProductUpdateRequest request) {
+        productService.updateProduct(productId, request);
+        return ResponseEntity.status(HttpStatus.OK).build();
+    }
+  
+      // 검색
     @GetMapping("/api/products")
     public ApiResponse<PageResponseDto<ProductListResponseDto>> getProducts(
             @RequestParam(defaultValue = "0") int page,
