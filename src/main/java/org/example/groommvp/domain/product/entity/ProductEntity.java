@@ -16,7 +16,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -24,7 +24,6 @@ import lombok.NoArgsConstructor;
 @Getter
 @Table(name = "products")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
 public class ProductEntity {
 
     @Id
@@ -43,10 +42,27 @@ public class ProductEntity {
     private Integer productPrice;
 
     @CreationTimestamp
-    @Column(name = "product_created", nullable = false, updatable = false)
-    private LocalDateTime productCreated;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Builder
+    public ProductEntity(
+            String productName,
+            Integer productPrice
+    ) {
+        this.productName = productName;
+        this.productPrice = productPrice;
+    }
+
+    public void update(
+            String productName,
+            Integer productPrice
+    ) {
+        this.productName = productName;
+        this.productPrice = productPrice;
+    }
 }
