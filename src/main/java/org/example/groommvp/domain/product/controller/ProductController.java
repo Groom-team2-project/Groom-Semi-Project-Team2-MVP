@@ -1,8 +1,7 @@
 package org.example.groommvp.domain.product.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.example.groommvp.domain.product.dto.PageResponse;
-import org.example.groommvp.domain.product.dto.ProductListResponse;
+import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.service.ProductService;
 import org.example.groommvp.global.common.ApiResponse;
 import org.springframework.data.domain.Page;
@@ -12,8 +11,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.Valid;
-import org.example.groommvp.domain.product.dto.ProductCreateRequest;
-import org.example.groommvp.domain.product.dto.ProductUpdateRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +26,11 @@ public class ProductController {
     public ResponseEntity<Void> createProduct(@Valid @RequestBody ProductCreateRequest request) {
         productService.createProduct(request);
         return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @GetMapping("/{productId}")
+    public ProductResponse getProduct(@PathVariable Long productId) {
+        return productService.getProduct(productId);
     }
 
     @PutMapping("/{productId}")

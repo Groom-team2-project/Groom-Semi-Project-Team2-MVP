@@ -2,6 +2,7 @@ package org.example.groommvp.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ProductListResponse;
+import org.example.groommvp.domain.product.dto.ProductResponse;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
@@ -27,6 +28,14 @@ public class ProductService {
                 .productPrice(request.getProductPrice())
                 .build();
         productRepository.save(product);
+    }
+
+    public ProductResponse getProduct(Long productId) {
+        ProductEntity product = checkProductExists(productId);
+        return new ProductResponse(
+                product.getProductName(),
+                product.getProductPrice()
+        );
     }
 
     @Transactional
