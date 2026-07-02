@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ProductListResponse;
 import org.example.groommvp.domain.product.dto.ProductResponse;
 import org.example.groommvp.domain.product.repository.ProductRepository;
+import org.example.groommvp.domain.stock.entity.StockEntity;
+import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.data.domain.Page;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final StockRepository stockRepository;
 
     @Transactional
     public void createProduct(ProductCreateRequest request) {
@@ -27,7 +30,13 @@ public class ProductService {
                 .productName(request.getProductName())
                 .productPrice(request.getProductPrice())
                 .build();
-        productRepository.save(product);
+        ProductEntity savedProduct =  productRepository.save(product);
+
+        StockEntity stock = StockEntity.builder()
+                .product(savedProduct)
+                .stocks(request.getStocks())
+                .build();
+        stockRepository.save(stock);
     }
 
     public ProductResponse getProduct(Long productId) {

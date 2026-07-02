@@ -20,4 +20,8 @@ public class ProductCreateRequest {
     @NotNull(message = "제품 가격을 입력하세요.")
     @Positive(message = "제품 가격은 0보다 커야 합니다.")
     private Integer productPrice;
+
+    @NotNull(message = "등록할 제품의 수량을 입력하세요.")
+    @Positive(message = "제품 수량은 0보다 커야 합니다.")
+    private Integer stocks;
 }
