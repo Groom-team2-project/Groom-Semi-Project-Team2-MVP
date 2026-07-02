@@ -2,6 +2,9 @@ package org.example.groommvp.domain.order.entity;
 
 import java.time.LocalDateTime;
 
+import org.example.groommvp.global.error.BusinessException;
+import org.example.groommvp.global.error.ErrorCode;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -61,5 +64,18 @@ public class Order {
     @PreUpdate
     void preUpdate() {
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void cancel() {
+        if (status.isCanceled()) {
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_CANCELED);
+        }
+        
+        if (!status.isCancelable()) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_CANCELABLE);
+        }
+
+        this.status = OrderStatus.CANCELED;
+        this.canceledAt = LocalDateTime.now();
     }
 }
