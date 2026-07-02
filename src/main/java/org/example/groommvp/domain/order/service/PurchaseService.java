@@ -1,5 +1,6 @@
 package org.example.groommvp.domain.order.service;
 
+import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.order.dto.PurchaseRequest;
 import org.example.groommvp.domain.order.dto.PurchaseResponse;
 import org.example.groommvp.domain.order.entity.Order;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class PurchaseService {
 
     private static final String PURCHASE_REASON = "PURCHASE";
@@ -27,20 +29,6 @@ public class PurchaseService {
     private final StockHistoryRepository stockHistoryRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-
-    public PurchaseService(
-            ProductRepository productRepository,
-            StockRepository stockRepository,
-            StockHistoryRepository stockHistoryRepository,
-            OrderRepository orderRepository,
-            OrderItemRepository orderItemRepository
-    ) {
-        this.productRepository = productRepository;
-        this.stockRepository = stockRepository;
-        this.stockHistoryRepository = stockHistoryRepository;
-        this.orderRepository = orderRepository;
-        this.orderItemRepository = orderItemRepository;
-    }
 
     @Transactional
     public PurchaseResponse purchase(Long productId, PurchaseRequest request) {

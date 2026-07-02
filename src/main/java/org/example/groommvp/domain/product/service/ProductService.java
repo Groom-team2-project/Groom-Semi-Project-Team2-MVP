@@ -1,7 +1,7 @@
 package org.example.groommvp.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.groommvp.domain.product.dto.ProductListResponseDto;
+import org.example.groommvp.domain.product.dto.ProductListResponse;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
@@ -49,15 +49,15 @@ public class ProductService {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
     }
-  
-    public Page<ProductListResponseDto> getProductList(String keyword, Pageable pageable) {
+
+    public Page<ProductListResponse> getProductList(String keyword, Pageable pageable) {
         //검색어가 있으면 검색해서 페이징
         if(keyword != null && !keyword.trim().isEmpty()) {
             return productRepository.findByProductNameContaining(keyword, pageable)
-                    .map(ProductListResponseDto::from);
+                    .map(ProductListResponse::from);
         }
 
         return productRepository.findAll(pageable)
-                .map(ProductListResponseDto::from);
+                .map(ProductListResponse::from);
     }
 }
