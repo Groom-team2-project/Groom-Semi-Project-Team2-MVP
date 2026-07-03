@@ -12,6 +12,7 @@ import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -54,6 +55,7 @@ public class PurchaseServiceConcurrencyTest {
 
     @Test
     // 상품은 총 N개 있다고 할 때, N명의 사용자가 1번씩 동시에 주문할 경우 정확하게 N개의 주문만 생성되는가
+    @DisplayName("")
     void concurrentPurchaseDecreaseStockExactly() throws InterruptedException {
         ProductEntity product = productRepository.save(
                 new ProductEntity("Test Product", 10000)
