@@ -1,0 +1,15 @@
+spring:
+  # 테스트 전용 DB: 메모리 안에서만 존재하는 H2 (MySQL 호환 모드)
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+  jpa:
+    hibernate:
+      # 테스트 시작 시 스키마 생성, 끝나면 삭제
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true

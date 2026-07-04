@@ -45,7 +45,7 @@ public class OrderCancelService {
     public OrderCancelResponse cancel(Long orderId) {
 
         // 1. 주문 조회
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdWithPessimisticLock(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
         // 2. 취소

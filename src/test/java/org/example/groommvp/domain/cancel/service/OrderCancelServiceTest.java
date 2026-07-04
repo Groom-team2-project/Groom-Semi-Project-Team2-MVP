@@ -51,7 +51,7 @@ class OrderCancelServiceTest {
 		OrderItem orderItem = new OrderItem(order, product, 2, 10000);   // 2개 샀던 품목
 		StockEntity stock = StockEntity.builder().product(product).stocks(8).build(); // 현재 재고 8
 
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
 		given(orderItemRepository.findByOrder(order)).willReturn(List.of(orderItem));
 		given(stockRepository.findByProductIdWithPessimisticLock(10L)).willReturn(Optional.of(stock));
 		given(stockHistoryRepository.save(any(StockHistoryEntity.class)))
@@ -75,7 +75,7 @@ class OrderCancelServiceTest {
 	void cancel_orderNotFound() {
 		// given
 		Long orderId = 999L;
-		given(orderRepository.findById(orderId)).willReturn(Optional.empty());
+		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.empty());
 
 		// when & then: 예외 타입 + 에러코드 검증
 		assertThatThrownBy(() -> orderCancelService.cancel(orderId))
@@ -94,7 +94,7 @@ class OrderCancelServiceTest {
 		Long orderId = 1L;
 		Order order = order(orderId);
 		order.cancel(); // 첫 취소 → CANCELED 상태가 됨
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
 
 		// when & then
 		assertThatThrownBy(() -> orderCancelService.cancel(orderId))
