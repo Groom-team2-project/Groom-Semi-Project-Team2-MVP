@@ -29,8 +29,9 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
-    public ProductResponse getProduct(@PathVariable Long productId) {
-        return productService.getProduct(productId);
+    public ResponseEntity<CommonResponse<ProductResponse>> getProduct(@PathVariable Long productId) {
+        ProductResponse response = productService.getProduct(productId);
+        return ResponseEntity.ok(CommonResponse.success(response, null));
     }
 
     @PutMapping("/{productId}")
