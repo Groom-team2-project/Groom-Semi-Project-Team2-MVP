@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ProductListResponse;
 import org.example.groommvp.domain.product.dto.ProductResponse;
 import org.example.groommvp.domain.product.repository.ProductRepository;
-import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
