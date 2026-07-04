@@ -66,6 +66,7 @@ com.shop.buyingmvp (최상위 패키지)
 #### ① 로컬 최신화 및 브랜치 생성
 항상 `develop` 브랜치의 최신 코드를 기반으로 새로운 작업 브랜치를 만듭니다.
 ```bash
+git switch [-c](브랜치를 생성하는 경우) <본인 브랜치 이름>
 git fetch origin
 git merge origin/develop
 ```
@@ -73,7 +74,8 @@ git merge origin/develop
 ### 3. 컨벤션 
 
 - Java 코드
-  camelCase를 사용합니다.
+
+camelCase를 사용합니다.
 
 ```java
 private Long productId;
@@ -84,7 +86,8 @@ private Long productId;
 ```
 
 - DB 테이블/컬럼
-  snake_case를 사용하며, 테이블명은 복수형을 사용합니다.
+
+snake_case를 사용하며, 테이블명은 복수형을 사용합니다.
 
 ```
 @Table(name = "products")
@@ -95,7 +98,8 @@ private Long productId;
 ```
 
 - API 경로
-  API 경로는 복수형 리소스명을 기준으로 작성합니다.
+
+API 경로는 복수형 리소스명을 기준으로 작성합니다.
 
 ```
 /api/v1/products
@@ -107,7 +111,8 @@ private Long productId;
 ```
 
 - 응답 형식
-  API 응답은 공통 응답 객체를 사용하도록 통일합니다.
+
+API 응답은 공통 응답 객체를 사용하도록 통일합니다.
 
 ex) 성공 / 실패
 ```json
@@ -131,7 +136,7 @@ ex) 성공 / 실패
 ```java
 ResponseEntity<CommonResponse<[Type]>>
 
-ex)
+ex) PurchaseResponse 타입을 반환하는 경우,
 @PostMapping("/{productId}/orders")
     public ResponseEntity<CommonResponse<PurchaseResponse>> purchase(
             @PathVariable Long productId,
