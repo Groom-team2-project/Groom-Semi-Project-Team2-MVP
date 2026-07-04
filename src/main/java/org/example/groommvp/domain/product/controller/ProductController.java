@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.service.ProductService;
 import org.example.groommvp.global.common.ApiResponse;
+import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -16,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/product")
+@RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
 public class ProductController {
 
@@ -29,8 +30,9 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
-    public ProductResponse getProduct(@PathVariable Long productId) {
-        return productService.getProduct(productId);
+    public ResponseEntity<CommonResponse<ProductResponse>> getProduct(@PathVariable Long productId) {
+        ProductResponse response = productService.getProduct(productId);
+        return ResponseEntity.ok(CommonResponse.success(response, null));
     }
 
     @PutMapping("/{productId}")

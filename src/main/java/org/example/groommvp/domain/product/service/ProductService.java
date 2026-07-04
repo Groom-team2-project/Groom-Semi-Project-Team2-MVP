@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ProductListResponse;
 import org.example.groommvp.domain.product.dto.ProductResponse;
 import org.example.groommvp.domain.product.repository.ProductRepository;
+import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
@@ -41,10 +42,9 @@ public class ProductService {
 
     public ProductResponse getProduct(Long productId) {
         ProductEntity product = checkProductExists(productId);
-        return new ProductResponse(
-                product.getProductName(),
-                product.getProductPrice()
-        );
+        StockEntity stock = stockRepository.findByProduct_ProductId(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
+        return ProductResponse.from(product, stock);
     }
 
     @Transactional

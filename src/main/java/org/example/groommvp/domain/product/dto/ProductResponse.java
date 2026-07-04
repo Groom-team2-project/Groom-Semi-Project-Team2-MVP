@@ -1,12 +1,25 @@
 package org.example.groommvp.domain.product.dto;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import org.example.groommvp.domain.product.entity.ProductEntity;
+import org.example.groommvp.domain.stock.entity.StockEntity;
 
 @Getter
-@AllArgsConstructor
+@Builder
 public class ProductResponse {
 
-    private String productName;
-    private Integer productPrice;
+    private final String productName;
+    private final Integer productPrice;
+    private final Integer stocks;
+
+    public static ProductResponse from(ProductEntity product, StockEntity stock) {
+        return ProductResponse.builder()
+                .productName(product.getProductName())
+                .productPrice(product.getProductPrice())
+                .stocks(stock.getStocks())
+                .build();
+    }
 }
