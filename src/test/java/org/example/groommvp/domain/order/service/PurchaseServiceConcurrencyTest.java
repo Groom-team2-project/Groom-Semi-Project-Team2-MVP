@@ -54,8 +54,7 @@ public class PurchaseServiceConcurrencyTest {
     }
 
     @Test
-    // 상품은 총 N개 있다고 할 때, N명의 사용자가 1번씩 동시에 주문할 경우 정확하게 N개의 주문만 생성되는가
-    @DisplayName("")
+    @DisplayName("상품은 총 N개 있다고 할 때, N명의 사용자가 1번씩 동시에 주문할 경우 정확하게 N개의 주문만 생성된다")
     void concurrentPurchaseDecreaseStockExactly() throws InterruptedException {
         ProductEntity product = productRepository.save(
                 new ProductEntity("Test Product", 10000)
@@ -110,7 +109,7 @@ public class PurchaseServiceConcurrencyTest {
     }
 
     @Test
-    // 상품이 총 N개 있을 때, N+@명의 사용자가 1번씩 동시에 주문할 경우, 정확히 N개의 주문만 생성되는가
+    @DisplayName("상품이 총 N개 있을 때, N+@명의 사용자가 1번씩 동시에 주문할 경우, 정확히 N개의 주문만 생성된다")
     void concurrentPurchaseCannotExceedStock() throws InterruptedException {
         ProductEntity product = productRepository.save(
                 new ProductEntity("Limited Product", 10000)
