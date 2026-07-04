@@ -3,7 +3,6 @@ package org.example.groommvp.domain.product.controller;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.service.ProductService;
-import org.example.groommvp.global.common.ApiResponse;
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -49,8 +48,8 @@ public class ProductController {
     }
   
       // 검색
-    @GetMapping("/products")
-    public ApiResponse<PageResponse<ProductListResponse>> getProducts(
+    @GetMapping("")
+    public ResponseEntity<CommonResponse<PageResponse<ProductListResponse>>> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword
@@ -60,11 +59,6 @@ public class ProductController {
 
         PageResponse<ProductListResponse> pageData = PageResponse.from(productPage);
 
-        ApiResponse<PageResponse<ProductListResponse>> response = new ApiResponse<>();
-        response.setStatus("SUCCESS");
-        response.setData(pageData);
-        response.setMessage(null);
-
-        return response;
+        return ResponseEntity.ok(CommonResponse.success(pageData, "상품 목록 조회 성공"));
     }
 }
