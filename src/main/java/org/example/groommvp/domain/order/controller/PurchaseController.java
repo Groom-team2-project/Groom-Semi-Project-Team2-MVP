@@ -3,6 +3,7 @@ package org.example.groommvp.domain.order.controller;
 import org.example.groommvp.domain.order.dto.PurchaseRequest;
 import org.example.groommvp.domain.order.dto.PurchaseResponse;
 import org.example.groommvp.domain.order.service.PurchaseService;
+import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,11 +25,11 @@ public class PurchaseController {
     }
 
     @PostMapping("/{productId}/orders")
-    public ResponseEntity<PurchaseResponse> purchase(
+    public ResponseEntity<CommonResponse<PurchaseResponse>> purchase(
             @PathVariable Long productId,
             @Valid @RequestBody PurchaseRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(purchaseService.purchase(productId, request));
+                .body(CommonResponse.success(purchaseService.purchase(productId, request), "구매가 정상적으로 처리되었습니다."));
     }
 }
