@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>응답은 팀 공통 포맷({@link CommonResponse}) 으로 감싸서 반환한다.
  */
 @RestController
-@RequestMapping("/api/products/{productId}")
+@RequestMapping("/api/v1/products/{productId}")
 @RequiredArgsConstructor
 public class StockController {
 
@@ -43,6 +43,6 @@ public class StockController {
     public ResponseEntity<CommonResponse<List<StockHistoryResponse>>> getHistories(
             @PathVariable Long productId) {
         List<StockHistoryResponse> response = stockService.getHistories(productId);
-        return ResponseEntity.ok(CommonResponse.success(response, null));
+        return ResponseEntity.ok(CommonResponse.success(response, "재고 변동 이력 조회 성공"));
     }
 }
