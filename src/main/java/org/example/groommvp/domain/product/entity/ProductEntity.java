@@ -31,13 +31,9 @@ public class ProductEntity {
     @Column(name = "product_id")
     private Long productId;
 
-    @NotBlank(message = "상품명을 입력해주세요.")
-    @Size(max = 50, message = "상품명은 최대 50자까지 입력 가능합니다.")
     @Column(name = "product_name", nullable = false, length = 50)
     private String productName;
 
-    @NotNull(message = "상품 가격을 입력해주세요.")
-    @Positive(message = "상품 가격은 0보다 커야 합니다.")
     @Column(name = "product_price", nullable = false)
     private Integer productPrice;
 
@@ -64,5 +60,6 @@ public class ProductEntity {
     ) {
         this.productName = productName;
         this.productPrice = productPrice;
+
     }
 }

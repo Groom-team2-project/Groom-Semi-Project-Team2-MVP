@@ -25,7 +25,7 @@ public class ProductService {
     private final StockRepository stockRepository;
 
     @Transactional
-    public void createProduct(ProductCreateRequest request) {
+    public Long createProduct(ProductCreateRequest request) {
         ProductEntity product = ProductEntity.builder()
                 .productName(request.getProductName())
                 .productPrice(request.getProductPrice())
@@ -37,6 +37,8 @@ public class ProductService {
                 .stocks(request.getStocks())
                 .build();
         stockRepository.save(stock);
+
+        return savedProduct.getProductId();
     }
 
     public ProductResponse getProduct(Long productId) {

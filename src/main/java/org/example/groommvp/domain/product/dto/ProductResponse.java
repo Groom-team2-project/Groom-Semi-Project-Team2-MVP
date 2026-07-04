@@ -1,7 +1,5 @@
 package org.example.groommvp.domain.product.dto;
 
-import jakarta.persistence.criteria.CriteriaBuilder;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import org.example.groommvp.domain.product.entity.ProductEntity;

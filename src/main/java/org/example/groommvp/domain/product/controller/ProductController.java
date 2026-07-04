@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -23,15 +25,16 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-    public ResponseEntity<Void> createProduct(@Valid @RequestBody ProductCreateRequest request) {
-        productService.createProduct(request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    public ResponseEntity<Map<String, Long>> createProduct(@Valid @RequestBody ProductCreateRequest request) {
+        Long productId = productService.createProduct(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(Map.of("id", productId));
     }
 
     @GetMapping("/{productId}")
     public ResponseEntity<CommonResponse<ProductResponse>> getProduct(@PathVariable Long productId) {
         ProductResponse response = productService.getProduct(productId);
-        return ResponseEntity.ok(CommonResponse.success(response, null));
+        return ResponseEntity.ok(CommonResponse.success(response, "상품 조회 성공"));
     }
 
     @PutMapping("/{productId}")
