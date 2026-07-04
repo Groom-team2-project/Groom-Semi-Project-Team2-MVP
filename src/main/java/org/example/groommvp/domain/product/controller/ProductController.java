@@ -48,7 +48,7 @@ public class ProductController {
   
       // 검색
     @GetMapping("")
-    public CommonResponse<PageResponse<ProductListResponse>> getProducts(
+    public ResponseEntity<CommonResponse<PageResponse<ProductListResponse>>> getProducts(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword
@@ -58,6 +58,6 @@ public class ProductController {
 
         PageResponse<ProductListResponse> pageData = PageResponse.from(productPage);
 
-        return CommonResponse.success(pageData, "상품 목록 조회 성공");
+        return ResponseEntity.ok(CommonResponse.success(pageData, "상품 목록 조회 성공"));
     }
 }
