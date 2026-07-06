@@ -6,6 +6,7 @@ import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
 import org.example.groommvp.domain.stock.dto.StockInRequest;
+import org.example.groommvp.domain.stock.dto.StockResponse;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
@@ -49,6 +50,14 @@ public class StockServiceImpl implements StockService {
         StockHistoryEntity saved = stockHistoryRepository.save(history);
 
         return StockHistoryResponse.from(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StockResponse getStock(Long productId) {
+        StockEntity stock = stockRepository.findByProduct_ProductId(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
+        return StockResponse.from(stock);
     }
 
     @Override
