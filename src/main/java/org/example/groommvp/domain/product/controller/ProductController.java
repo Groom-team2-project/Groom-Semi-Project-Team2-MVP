@@ -15,8 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -25,10 +23,10 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-    public ResponseEntity<Map<String, Long>> createProduct(@Valid @RequestBody ProductCreateRequest request) {
+    public ResponseEntity<CommonResponse<ProductCreateResponse>> createProduct(@Valid @RequestBody ProductCreateRequest request) {
         Long productId = productService.createProduct(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("id", productId));
+                .body(CommonResponse.success(new ProductCreateResponse(productId), "상품 등록 성공"));
     }
 
     @GetMapping("/{productId}")
