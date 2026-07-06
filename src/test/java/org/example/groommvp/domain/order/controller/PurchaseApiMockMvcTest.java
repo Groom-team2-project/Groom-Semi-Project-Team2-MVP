@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.order.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -89,6 +90,123 @@ class PurchaseApiMockMvcTest {
         assertThat(orderRepository.count()).isEqualTo(1);
         assertThat(orderItemRepository.count()).isEqualTo(1);
         assertThat(stockHistoryRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void purchaseApiReturnsBadRequestWhenQuantityIsZero() throws Exception {
+        ProductEntity product = productRepository.save(new ProductEntity("Invalid Quantity Product", 10000));
+        stockRepository.save(new StockEntity(product, 10));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":0}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT_VALUE"));
+
+        assertThat(orderRepository.count()).isZero();
+        assertThat(orderItemRepository.count()).isZero();
+        assertThat(stockHistoryRepository.count()).isZero();
+    }
+
+    @Test
+    void purchaseApiReturnsBadRequestWhenRequestBodyHasInvalidType() throws Exception {
+        ProductEntity product = productRepository.save(new ProductEntity("Invalid Body Product", 10000));
+        stockRepository.save(new StockEntity(product, 10));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":"invalid"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT_VALUE"));
+
+        assertThat(orderRepository.count()).isZero();
+        assertThat(orderItemRepository.count()).isZero();
+        assertThat(stockHistoryRepository.count()).isZero();
+    }
+
+    @Test
+    void purchaseApiReturnsBadRequestWhenProductIdHasInvalidType() throws Exception {
+        mockMvc.perform(post("/api/v1/products/{productId}/orders", "abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":1}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_INPUT_VALUE"));
+    }
+
+    @Test
+    void purchaseApiReturnsNotFoundWhenProductDoesNotExist() throws Exception {
+        mockMvc.perform(post("/api/v1/products/{productId}/orders", 999L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":1}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("PRODUCT_NOT_FOUND"));
+    }
+
+    @Test
+    void purchaseApiReturnsNotFoundWhenStockDoesNotExist() throws Exception {
+        ProductEntity product = productRepository.save(new ProductEntity("No Stock Product", 10000));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":1}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("STOCK_NOT_FOUND"));
+
+        assertThat(orderRepository.count()).isZero();
+        assertThat(orderItemRepository.count()).isZero();
+        assertThat(stockHistoryRepository.count()).isZero();
+    }
+
+    @Test
+    void purchaseApiReturnsConflictWhenStockIsNotEnough() throws Exception {
+        ProductEntity product = productRepository.save(new ProductEntity("Limited Stock Product", 10000));
+        StockEntity stock = stockRepository.save(new StockEntity(product, 1));
+
+        mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"quantity":2}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("OUT_OF_STOCK"));
+
+        StockEntity savedStock = stockRepository.findById(stock.getStockId()).orElseThrow();
+
+        assertThat(savedStock.getStocks()).isEqualTo(1);
+        assertThat(orderRepository.count()).isZero();
+        assertThat(orderItemRepository.count()).isZero();
+        assertThat(stockHistoryRepository.count()).isZero();
+    }
+
+    @Test
+    void purchaseApiReturnsMethodNotAllowedWhenHttpMethodIsNotSupported() throws Exception {
+        mockMvc.perform(get("/api/v1/products/{productId}/orders", 1L))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("METHOD_NOT_ALLOWED"));
     }
 
     @Test
