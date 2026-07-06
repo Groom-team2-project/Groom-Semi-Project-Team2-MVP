@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
 import org.example.groommvp.domain.stock.dto.StockInRequest;
+import org.example.groommvp.domain.stock.dto.StockResponse;
 import org.example.groommvp.domain.stock.service.StockService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,14 @@ public class StockController {
         StockHistoryResponse response = stockService.stockIn(productId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "입고가 완료되었습니다."));
+    }
+
+    /** 상품의 현재 재고 조회. */
+    @GetMapping("/stock")
+    public ResponseEntity<CommonResponse<StockResponse>> getStock(
+            @PathVariable Long productId) {
+        StockResponse response = stockService.getStock(productId);
+        return ResponseEntity.ok(CommonResponse.success(response, "재고 조회 성공"));
     }
 
     /** 상품의 재고 변동 이력 조회. */
