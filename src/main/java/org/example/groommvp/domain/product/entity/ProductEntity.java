@@ -37,6 +37,14 @@ public class ProductEntity {
     @Column(name = "product_price", nullable = false)
     private Integer productPrice;
 
+    /** 삭제 유무 */
+    @Column(name = "is_deleted", nullable = false)
+    private boolean deleted = false;
+
+    /** 삭제된 시간 */
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -61,5 +69,11 @@ public class ProductEntity {
         this.productName = productName;
         this.productPrice = productPrice;
 
+    }
+
+    /** 삭제 처리 */
+    public void delete() {
+        this.deleted = true;
+        this.deletedAt = LocalDateTime.now();
     }
 }

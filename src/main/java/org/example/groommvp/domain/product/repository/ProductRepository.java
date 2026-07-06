@@ -11,4 +11,7 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
     //상품 이름으로 검색
     Page<ProductEntity> findByProductNameContaining(String keyword, Pageable pageable);
+
+    //삭제되지 않은 상품 단건 조회
+    Optional<ProductEntity> findByProductIdAndDeletedFalse(Long productId);
 }

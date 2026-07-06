@@ -24,6 +24,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
 
+    //상품 등록
     @Transactional
     public Long createProduct(ProductCreateRequest request) {
         ProductEntity product = ProductEntity.builder()
@@ -41,31 +42,39 @@ public class ProductService {
         return savedProduct.getProductId();
     }
 
+    //상품 단건 조회
     public ProductResponse getProduct(Long productId) {
-        ProductEntity product = checkProductExists(productId);
+        ProductEntity product = getActiveProduct(productId);
         StockEntity stock = stockRepository.findByProduct_ProductId(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
         return ProductResponse.from(product, stock);
     }
 
+    //상품 수정
     @Transactional
     public void updateProduct(Long productId, ProductUpdateRequest request) {
-        ProductEntity product = checkProductExists(productId);
+        ProductEntity product = getActiveProduct(productId);
         product.update(
                 request.getProductName(),
                 request.getProductPrice()
         );
     }
 
+    //상품 삭제
     @Transactional
     public void deleteProduct(Long productId) {
-        ProductEntity product = checkProductExists(productId);
-        productRepository.delete(product);
+        ProductEntity product = getActiveProduct(productId);
+        StockEntity stock = stockRepository.findByProduct_ProductId(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
+        if (stock.getStocks() > 0) {
+            throw new BusinessException(ErrorCode.PRODUCT_STOCK_REMAINING);
+        }
+        product.delete();
     }
 
-    //제품존제를 확인해줌
-    private ProductEntity checkProductExists(Long productId){
-        return productRepository.findById(productId)
+    /** 삭제 안된 상품 찾기*/
+    private ProductEntity getActiveProduct(Long productId){
+        return productRepository.findByProductIdAndDeletedFalse(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
     }
 
