@@ -2,6 +2,7 @@ package org.example.groommvp.domain.stock.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -9,12 +10,13 @@ import lombok.NoArgsConstructor;
  * 상품 입고 요청 DTO.
  *
  * <pre>
- * POST /api/products/{productId}/stock-in
+ * POST /api/v1/products/{productId}/stock-in
  * { "quantity": 10, "reason": "정기 입고" }
  * </pre>
  */
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
 public class StockInRequest {
 
     @NotNull(message = "입고 수량은 필수입니다.")
