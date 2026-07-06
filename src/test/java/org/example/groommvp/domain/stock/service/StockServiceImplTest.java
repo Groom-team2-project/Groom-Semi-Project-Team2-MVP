@@ -12,6 +12,7 @@ import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
 import org.example.groommvp.domain.stock.dto.StockInRequest;
+import org.example.groommvp.domain.stock.dto.StockResponse;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryType;
@@ -114,6 +115,38 @@ class StockServiceImplTest {
                 .isEqualTo(ErrorCode.PRODUCT_NOT_FOUND);
 
         verify(stockHistoryRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("현재 재고 조회에 성공하면 상품/수량 정보를 반환한다")
+    void getStock_success() {
+        // given
+        Long productId = 1L;
+        ProductEntity product = product(productId, "티셔츠", 10000);
+        StockEntity stock = StockEntity.builder().product(product).stocks(42).build();
+        given(stockRepository.findByProduct_ProductId(productId)).willReturn(Optional.of(stock));
+
+        // when
+        StockResponse response = stockService.getStock(productId);
+
+        // then
+        assertThat(response.getProductId()).isEqualTo(productId);
+        assertThat(response.getProductName()).isEqualTo("티셔츠");
+        assertThat(response.getStocks()).isEqualTo(42);
+    }
+
+    @Test
+    @DisplayName("재고 레코드가 없으면 STOCK_NOT_FOUND 예외가 발생한다")
+    void getStock_notFound() {
+        // given
+        Long productId = 999L;
+        given(stockRepository.findByProduct_ProductId(productId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> stockService.getStock(productId))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.STOCK_NOT_FOUND);
     }
 
     /** develop 의 ProductEntity 는 (productName, productPrice) 빌더만 있어, id 는 리플렉션으로 채운다. */
