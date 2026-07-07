@@ -1,5 +1,8 @@
 package org.example.groommvp.domain.order.entity;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "주문 상태")
 public enum OrderStatus {
     COMPLETED, // 구매 완료
     CANCELED; // 취소됨
