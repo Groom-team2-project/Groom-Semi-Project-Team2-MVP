@@ -37,10 +37,6 @@ public class ProductEntity {
     @Column(name = "product_price", nullable = false)
     private Integer productPrice;
 
-    /** 삭제 유무 */
-    @Column(name = "is_deleted", nullable = false)
-    private boolean deleted = false;
-
     /** 삭제된 시간 */
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -73,7 +69,6 @@ public class ProductEntity {
 
     /** 삭제 처리 */
     public void delete() {
-        this.deleted = true;
         this.deletedAt = LocalDateTime.now();
     }
 }

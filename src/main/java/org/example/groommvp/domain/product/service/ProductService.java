@@ -74,7 +74,7 @@ public class ProductService {
 
     /** 삭제 안된 상품 찾기*/
     private ProductEntity getActiveProduct(Long productId){
-        return productRepository.findByProductIdAndDeletedFalse(productId)
+        return productRepository.findByProductIdAndDeletedAtIsNull(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
     }
 

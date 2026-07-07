@@ -13,5 +13,5 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     Page<ProductEntity> findByProductNameContaining(String keyword, Pageable pageable);
 
     //삭제되지 않은 상품 단건 조회
-    Optional<ProductEntity> findByProductIdAndDeletedFalse(Long productId);
+    Optional<ProductEntity> findByProductIdAndDeletedAtIsNull(Long productId);
 }
