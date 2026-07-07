@@ -2,7 +2,7 @@
 
 ## 1. Swagger 작성 목적
 
-Swagger 문서는 프론트엔드, QA, 백엔드 팀원이 코드를 직접 보지 않고도 API를 연동하고 검증할 수 있게 만드는 내부 계약서입니다.
+Swagger 문서는 백엔드 팀원이 코드를 직접 보지 않고도 API를 연동하고 검증할 수 있게 만드는 내부 계약서입니다.
 
 완료 기준은 Swagger UI가 열리는 것이 아니라, 실제 요청/응답 JSON, HTTP status, errorCode, message가 문서와 일치하는 것입니다.
 
