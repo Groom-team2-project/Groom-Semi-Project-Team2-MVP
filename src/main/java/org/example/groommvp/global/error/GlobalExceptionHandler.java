@@ -2,24 +2,25 @@ package org.example.groommvp.global.error;
 
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<CommonResponse<Void>> handleBusinessException(BusinessException e) {
         ErrorCode errorCode = e.getErrorCode();
         return ResponseEntity
-            .status(errorCode.getStatus())
-            .body(CommonResponse.error(errorCode.name(), errorCode.getMessage()));
+                .status(errorCode.getStatus())
+                .body(CommonResponse.error(errorCode.name(), errorCode.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -81,11 +82,20 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<CommonResponse<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
+        return ResponseEntity
+                .status(ErrorCode.RESOURCE_NOT_FOUND.getStatus())
+                .body(CommonResponse.error(
+                        ErrorCode.RESOURCE_NOT_FOUND.name(),
+                        ErrorCode.RESOURCE_NOT_FOUND.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<CommonResponse<Void>> handleException(Exception e) {
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
         return ResponseEntity
-            .status(errorCode.getStatus())
-            .body(CommonResponse.error(errorCode.name(), errorCode.getMessage()));
+                .status(errorCode.getStatus())
+                .body(CommonResponse.error(errorCode.name(), errorCode.getMessage()));
     }
 }
