@@ -47,7 +47,7 @@ public class ProductController {
         productService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
     }
-  
+
       // 검색
     @GetMapping("")
     public ResponseEntity<CommonResponse<PageResponse<ProductListResponse>>> getProducts(
