@@ -5,6 +5,7 @@ import lombok.*;
 
 @Getter
 @Setter
+@Deprecated(since = "0.0.1", forRemoval = false)
 @JsonPropertyOrder({"status", "data", "message"})
 public class ApiResponse<T> {
     private String status;
