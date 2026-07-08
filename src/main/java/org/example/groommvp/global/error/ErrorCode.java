@@ -15,6 +15,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
 
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+    PRODUCT_INVALID_STATE(HttpStatus.CONFLICT, "상품 상태가 올바르지 않습니다."),
     PRODUCT_ALREADY_DELETED(HttpStatus.CONFLICT, "이미 삭제된 상품입니다."),
     PRODUCT_STOCK_REMAINING(HttpStatus.CONFLICT, "재고가 남아 있어 상품을 삭제할 수 없습니다."),
 

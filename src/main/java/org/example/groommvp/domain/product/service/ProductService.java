@@ -74,8 +74,12 @@ public class ProductService {
 
     /** 삭제 안된 상품 찾기*/
     private ProductEntity getActiveProduct(Long productId){
-        return productRepository.findByProductIdAndDeletedAtIsNull(productId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
+        ProductEntity product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)); //등록되지 않은 상품
+        if (product.getDeletedAt() != null) { //이미 삭제된 상품
+            throw new BusinessException(ErrorCode.PRODUCT_ALREADY_DELETED);
+        }
+        return product;
     }
 
     public Page<ProductListResponse> getProductList(String keyword, Pageable pageable) {

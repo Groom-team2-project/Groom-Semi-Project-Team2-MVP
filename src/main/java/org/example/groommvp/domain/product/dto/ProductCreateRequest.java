@@ -1,7 +1,10 @@
 package org.example.groommvp.domain.product.dto;
 
-import jakarta.validation.constraints.*;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -27,6 +30,6 @@ public class ProductCreateRequest {
     @Schema(description = "초기 재고 수량 (1 이상)", example = "100",
             minimum = "1", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "등록할 제품의 수량을 입력하세요.")
-    @Min(value = 0, message = "0개 이상")
+    @Positive(message = "제품 수량은 0보다 커야 합니다.")
     private Integer stocks;
 }
