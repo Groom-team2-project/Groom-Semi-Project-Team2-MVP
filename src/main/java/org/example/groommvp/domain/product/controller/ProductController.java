@@ -36,7 +36,18 @@ public class ProductController {
     @Operation(summary = "상품 등록", description = "새로운 상품을 등록합니다. 상품 등록 시 초기 재고 수량도 함께 설정됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "상품 등록 성공",
-                    content = @Content(schema = @Schema(hidden = true))),
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = SwaggerResponse.ProductCreateCommonResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                        "success": true,
+                                        "data": {
+                                            "productId": 1
+                                        },
+                                        "errorCode": null,
+                                        "message": "상품 등록 성공"
+                                    }
+                                    """))),
             @ApiResponse(responseCode = "400", description = "입력값 유효성 검사 실패",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -179,14 +190,45 @@ public class ProductController {
             @ApiResponse(responseCode = "404", description = "상품을 찾을 수 없음",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                        "success": false,
-                                        "data": null,
-                                        "errorCode": "PRODUCT_NOT_FOUND",
-                                        "message": "상품을 찾을 수 없습니다."
-                                    }
-                                    """))),
+                            examples = {
+                                    @ExampleObject(name = "상품 없음", value = """
+                                            {
+                                                "success": false,
+                                                "data": null,
+                                                "errorCode": "PRODUCT_NOT_FOUND",
+                                                "message": "상품을 찾을 수 없습니다."
+                                            }
+                                            """),
+                                    @ExampleObject(name = "재고 정보 없음", value = """
+                                            {
+                                                "success": false,
+                                                "data": null,
+                                                "errorCode": "STOCK_NOT_FOUND",
+                                                "message": "재고를 찾을 수 없습니다."
+                                            }
+                                            """)
+                            })),
+            @ApiResponse(responseCode = "409", description = "이미 삭제되었거나 재고가 남아 삭제할 수 없음",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "이미 삭제된 상품", value = """
+                                            {
+                                                "success": false,
+                                                "data": null,
+                                                "errorCode": "PRODUCT_ALREADY_DELETED",
+                                                "message": "이미 삭제된 상품입니다."
+                                            }
+                                            """),
+                                    @ExampleObject(name = "재고 남아 있음", value = """
+                                            {
+                                                "success": false,
+                                                "data": null,
+                                                "errorCode": "PRODUCT_STOCK_REMAINING",
+                                                "message": "재고가 남아 있어 상품을 삭제할 수 없습니다."
+                                            }
+                                            """)
+                            })),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),

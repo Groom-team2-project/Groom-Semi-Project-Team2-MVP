@@ -24,7 +24,7 @@ public class OpenApiConfig {
 
                                 ### 공통 응답 형식
                                 **대부분의 조회·생성 성공 응답**은 `CommonResponse<T>` 로 감싸져 반환됩니다.
-                                단, 상품 등록(POST /api/v1/products)은 예외적으로 **201 빈 body**를 반환합니다.
+                                상품 등록(POST /api/v1/products)은 **201 상태 코드와 생성된 상품 ID**를 반환합니다.
                                 리소스 수정(PUT)·삭제(DELETE)는 **204 빈 body**를 반환합니다.
 
                                 성공 응답의 **Schema 탭**에는 `CommonResponse` 구조와 `data` 필드의 구체 타입을 함께 표시합니다.
