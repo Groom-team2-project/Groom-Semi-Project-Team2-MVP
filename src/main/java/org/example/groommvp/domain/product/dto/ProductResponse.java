@@ -1,8 +1,6 @@
 package org.example.groommvp.domain.product.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import org.example.groommvp.domain.product.entity.ProductEntity;

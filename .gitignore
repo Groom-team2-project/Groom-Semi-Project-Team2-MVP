@@ -67,6 +67,7 @@ Desktop.ini
 
 ## Gradle
 .gradle/
+.gradle-cache/
 gradle-app.setting
 !gradle-wrapper.jar
 

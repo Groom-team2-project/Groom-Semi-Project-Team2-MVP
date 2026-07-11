@@ -61,9 +61,10 @@ public class ProductController {
                                     """)))
     })
     @PostMapping
-    public ResponseEntity<Void> createProduct(@Valid @RequestBody ProductCreateRequest request) {
-        productService.createProduct(request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    public ResponseEntity<CommonResponse<ProductCreateResponse>> createProduct(@Valid @RequestBody ProductCreateRequest request) {
+        Long productId = productService.createProduct(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(CommonResponse.success(new ProductCreateResponse(productId), "상품 등록 성공"));
     }
 
     @Operation(summary = "상품 단건 조회", description = "상품 ID로 특정 상품의 상세 정보를 조회합니다.")
@@ -121,7 +122,7 @@ public class ProductController {
             @Parameter(description = "상품 ID", example = "1", required = true)
             @PathVariable Long productId) {
         ProductResponse response = productService.getProduct(productId);
-        return ResponseEntity.ok(CommonResponse.success(response, null));
+        return ResponseEntity.ok(CommonResponse.success(response, "상품 조회 성공"));
     }
 
     @Operation(summary = "상품 수정", description = "상품명과 가격을 수정합니다. 재고 수량은 별도의 입고 API를 통해 변경합니다.")
@@ -205,7 +206,7 @@ public class ProductController {
         productService.deleteProduct(productId);
         return ResponseEntity.noContent().build();
     }
-  
+
       // 검색
     @Operation(summary = "상품 목록 조회", description = "상품 목록을 페이지네이션으로 조회합니다. keyword 파라미터로 상품명 검색이 가능합니다.")
     @ApiResponses({
