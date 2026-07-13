@@ -3,6 +3,7 @@ package org.example.groommvp.global.response;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.example.groommvp.domain.cancel.dto.OrderCancelResponse;
+import org.example.groommvp.domain.order.dto.OrderResponse;
 import org.example.groommvp.domain.order.dto.PurchaseResponse;
 import org.example.groommvp.domain.product.dto.ProductCreateResponse;
 import org.example.groommvp.domain.product.dto.ProductPageResponse;
@@ -69,6 +70,19 @@ public final class SwaggerResponse {
             @Schema(description = "성공 응답에서는 null", nullable = true, example = "null")
             String errorCode,
             @Schema(description = "응답 메시지", nullable = true, example = "구매가 정상적으로 처리되었습니다.")
+            String message
+    ) {
+    }
+
+    @Schema(name = "OrderCommonResponse", description = "주문 단건 조회 성공 응답")
+    public record OrderCommonResponse(
+            @Schema(description = "요청 성공 여부", example = "true")
+            boolean success,
+            @Schema(description = "주문 조회 응답 데이터")
+            OrderResponse data,
+            @Schema(description = "성공 응답에서는 null", nullable = true, example = "null")
+            String errorCode,
+            @Schema(description = "응답 메시지", nullable = true, example = "주문 조회 성공")
             String message
     ) {
     }
