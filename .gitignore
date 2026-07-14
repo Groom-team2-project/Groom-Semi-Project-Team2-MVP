@@ -19,6 +19,7 @@ application-secret.yml
 *.env
 .env
 .env.*
+!.env.example
 
 # ========================
 # IDE 설정
