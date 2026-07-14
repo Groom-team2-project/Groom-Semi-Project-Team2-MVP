@@ -3,6 +3,7 @@ package org.example.groommvp.domain.order.entity;
 import java.time.LocalDateTime;
 
 import org.example.groommvp.domain.product.entity.ProductEntity;
+import org.example.groommvp.global.entity.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,7 +24,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "order_items")
-public class OrderItem {
+public class OrderItem extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,12 +45,6 @@ public class OrderItem {
     @Column(name = "order_price", nullable = false)
     private int orderPrice;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     public OrderItem(Order order, ProductEntity product, int quantity, int orderPrice) {
         if (quantity <= 0) {
             throw new IllegalArgumentException("주문 수량은 1 이상이어야 합니다.");
@@ -58,17 +53,5 @@ public class OrderItem {
         this.product = product;
         this.quantity = quantity;
         this.orderPrice = orderPrice;
-    }
-
-    @PrePersist
-    void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }
