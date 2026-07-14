@@ -4,9 +4,9 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${TEST_DATASOURCE_URL:jdbc:mysql://localhost:3306/buying_mvp_test?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
-    username: ${TEST_DATASOURCE_USERNAME:root}
-    password: ${TEST_DATASOURCE_PASSWORD:${SPRING_DATASOURCE_PASSWORD:password}}
+    url: ${TEST_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_TEST_DATABASE:buying_mvp_test}?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${TEST_DATASOURCE_USERNAME:${MYSQL_USERNAME:root}}
+    password: ${TEST_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD:password}}
 
   jpa:
     hibernate:

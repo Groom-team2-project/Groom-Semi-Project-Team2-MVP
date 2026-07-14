@@ -1,9 +1,12 @@
 spring:
+    config:
+        import: optional:file:.env[.properties]
+
     datasource:
         driver-class-name: com.mysql.cj.jdbc.Driver
-        url: jdbc:mysql://localhost:3306/buying_mvp?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-        username: root
-        password: password
+        url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:buying_mvp}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+        username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USERNAME:root}}
+        password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD:password}}
 
     jpa:
         hibernate:
