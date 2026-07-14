@@ -15,6 +15,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.groommvp.domain.product.entity.ProductEntity;
+import org.example.groommvp.global.entity.BaseEntity;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.hibernate.annotations.CreationTimestamp;
@@ -32,7 +33,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Getter
 @Table(name = "stocks")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StockEntity {
+public class StockEntity extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,14 +48,6 @@ public class StockEntity {
     /** 현재 재고 수량. */
     @Column(name = "stocks", nullable = false)
     private int stocks;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     @Builder
     public StockEntity(ProductEntity product, int stocks) {

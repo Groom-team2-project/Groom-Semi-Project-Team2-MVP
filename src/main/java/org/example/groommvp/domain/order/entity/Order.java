@@ -2,6 +2,7 @@ package org.example.groommvp.domain.order.entity;
 
 import java.time.LocalDateTime;
 
+import org.example.groommvp.global.entity.BaseEntity;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 
@@ -23,7 +24,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "orders")
-public class Order {
+public class Order extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,30 +41,12 @@ public class Order {
     @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     public Order(int totalPrice) {
         if (totalPrice < 0) {
             throw new IllegalArgumentException("주문 금액은 0 이상이어야 합니다.");
         }
         this.status = OrderStatus.COMPLETED;
         this.totalPrice = totalPrice;
-    }
-
-    @PrePersist
-    void prePersist() {
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 
     public void cancel() {
