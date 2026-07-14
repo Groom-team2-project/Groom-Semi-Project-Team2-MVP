@@ -1,0 +1,31 @@
+package org.example.groommvp.global.error;
+
+import org.springframework.http.HttpStatus;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+@Getter
+@RequiredArgsConstructor
+public enum ErrorCode {
+
+    INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다."),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메서드입니다."),
+    RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
+
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
+    PRODUCT_ALREADY_DELETED(HttpStatus.CONFLICT, "이미 삭제된 상품입니다."),
+    PRODUCT_STOCK_REMAINING(HttpStatus.CONFLICT, "재고가 남아 있어 상품을 삭제할 수 없습니다."),
+
+    INVALID_STOCK_QUANTITY(HttpStatus.BAD_REQUEST, "재고 수량은 1 이상이어야 합니다."),
+    STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "재고를 찾을 수 없습니다."),
+    OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+
+    ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
+    ORDER_ALREADY_CANCELED(HttpStatus.CONFLICT, "이미 취소된 주문입니다."),
+    ORDER_NOT_CANCELABLE(HttpStatus.CONFLICT, "취소할 수 없는 주문 상태입니다.");
+
+    private final HttpStatus status;
+    private final String message;
+}
