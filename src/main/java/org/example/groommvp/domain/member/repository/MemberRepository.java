@@ -9,4 +9,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface MemberRepository extends JpaRepository<MemberEntity, Long> {
 
     Optional<MemberEntity> findByProviderAndProviderId(AuthProvider provider, String providerId);
+
+    long countByProviderAndProviderId(AuthProvider provider, String providerId);
 }
