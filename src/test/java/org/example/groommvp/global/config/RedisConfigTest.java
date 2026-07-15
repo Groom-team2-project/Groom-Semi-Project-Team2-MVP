@@ -5,20 +5,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RedissonClient;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-@SpringBootTest
-@ActiveProfiles("local")
 class RedisConfigTest {
 
-    @Autowired
-    private RedissonClient redissonClient;
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(RedisConfig.class)
+            .withPropertyValues(
+                    "redis.host=localhost",
+                    "redis.port=6379"
+            );
 
     @Test
     @DisplayName("RedissonClient가 Spring Bean으로 등록됩니다")
     void redissonClientBeanExists() {
-        assertThat(redissonClient).isNotNull();
+        contextRunner.run(context -> assertThat(context)
+                .hasSingleBean(RedissonClient.class));
     }
 }
