@@ -85,6 +85,7 @@ logs/
 log/
 tmp/
 temp/
+outputs/
 
 # ========================
 # Spring Boot 관련
