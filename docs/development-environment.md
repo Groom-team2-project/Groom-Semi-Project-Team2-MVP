@@ -30,10 +30,33 @@ Copy-Item .env.example .env
 | `MYSQL_PORT` | `3306` | 호스트에서 노출할 MySQL 포트 |
 | `MYSQL_DATABASE` | `buying_mvp` | 애플리케이션 DB |
 | `MYSQL_TEST_DATABASE` | `buying_mvp_test` | MySQL 기반 테스트 DB |
-| `MYSQL_USERNAME` | `root` | Spring 앱과 테스트 접속 계정 |
 | `MYSQL_ROOT_PASSWORD` | `password` | 로컬 MySQL root 비밀번호 |
 
-`SPRING_DATASOURCE_*`, `TEST_DATASOURCE_*`는 특수 환경에서만 덮어쓰는 선택 변수입니다. 기본 로컬 개발에서는 `MYSQL_*` 값만 수정하면 Docker Compose, 애플리케이션, MySQL 테스트 프로필이 같은 값을 기준으로 동작합니다.
+현재 Docker Compose는 로컬 개발용 MySQL root 계정만 provision합니다. `MYSQL_USERNAME` 같은 사용자 정의 계정은 아직 지원하지 않습니다. 별도 계정이 필요하면 Compose 환경 변수와 초기화 스크립트에 사용자 생성 로직을 함께 추가해야 합니다.
+
+## 애플리케이션 설정 분리
+
+공통 설정인 `src/main/resources/application.yaml`은 운영/배포 환경을 고려해 datasource 값을 필수 환경 변수로 받습니다. 값이 누락되면 애플리케이션이 시작 중 실패합니다.
+
+```yaml
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+```
+
+로컬 기본값은 `src/main/resources/application-local.yaml`에만 둡니다. 로컬에서 애플리케이션을 실행할 때는 `local` 프로필을 사용합니다.
+
+```bash
+./gradlew bootRun --args='--spring.profiles.active=local'
+```
+
+Windows PowerShell에서는 아래 명령을 사용합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
 
 ## Docker Compose 구성
 
@@ -43,6 +66,7 @@ Copy-Item .env.example .env
 | 컨테이너 이름 | `groom-mvp-mysql` |
 | 애플리케이션 DB | `buying_mvp` |
 | 테스트 DB | `buying_mvp_test` |
+| 계정 | `root` |
 | 포트 | `3306:3306` |
 | 문자셋 | `utf8mb4` |
 | 컨테이너 타임존 | `Asia/Seoul` |
@@ -70,18 +94,6 @@ docker compose down -v
 ```
 
 `docker compose down -v`를 실행하면 MySQL 볼륨이 삭제되므로 기존 로컬 데이터도 함께 사라집니다.
-
-## 애플리케이션 DB 연결
-
-`src/main/resources/application.yaml`은 환경 변수를 우선 사용하고, 값이 없으면 `MYSQL_*` 로컬 기본값으로 실행됩니다.
-
-```yaml
-spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:buying_mvp}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
-    username: ${SPRING_DATASOURCE_USERNAME:${MYSQL_USERNAME:root}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${MYSQL_ROOT_PASSWORD:password}}
-```
 
 ## 테스트 DB 연결
 
