@@ -13,3 +13,7 @@ kakao:
         client-id: ${KAKAO_CLIENT_ID:}
         client-secret: ${KAKAO_CLIENT_SECRET:}
         redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/v1/auth/kakao/callback}
+
+redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}

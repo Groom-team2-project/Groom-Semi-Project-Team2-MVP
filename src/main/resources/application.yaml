@@ -16,6 +16,10 @@ spring:
                 show_sql: true
                 format_sql: true
 
+redis:
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+
 springdoc:
     swagger-ui:
         path: /swagger-ui.html
