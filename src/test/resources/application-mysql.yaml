@@ -14,3 +14,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+app:
+  jwt:
+    secret: test-jwt-secret-key-for-auth-context
+    access-token-expiration-seconds: 7200
