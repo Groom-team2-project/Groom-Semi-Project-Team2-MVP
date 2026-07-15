@@ -9,9 +9,7 @@ public record JwtProperties(
 ) {
     public JwtProperties {
         if (secret == null || secret.isBlank()) {
-            // TODO: .env를 통해 secret Key 관리할 것.
-            // 이후 배포 이전에 모든 Secret Key는 .env에 저장해야합니다.
-            secret = "local-dev-jwt-secret-key-change-before-deploy";
+            throw new IllegalStateException("app.jwt.secret 설정이 필요합니다. .env 등을 통해 값을 주입하세요.");
         }
         if (accessTokenExpirationSeconds <= 0) {
             accessTokenExpirationSeconds = 7200;

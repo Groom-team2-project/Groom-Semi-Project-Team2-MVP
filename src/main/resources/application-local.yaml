@@ -17,3 +17,7 @@ kakao:
 redis:
     host: ${REDIS_HOST:localhost}
     port: ${REDIS_PORT:6379}
+
+app:
+    jwt:
+        secret: ${JWT_SECRET:local-dev-jwt-secret-key-change-before-deploy}

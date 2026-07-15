@@ -13,7 +13,6 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoders;
-import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Component;
@@ -29,6 +28,7 @@ public class KakaoOAuthClient {
 
     private final KakaoOAuthProperties properties;
     private final RestClient restClient;
+    private volatile JwtDecoder jwtDecoder;
 
     public KakaoOAuthClient(KakaoOAuthProperties properties, RestClient.Builder restClientBuilder) {
         this.properties = properties;
@@ -75,13 +75,27 @@ public class KakaoOAuthClient {
         }
 
         try {
-            JwtDecoder jwtDecoder = JwtDecoders.fromIssuerLocation(properties.issuerUri());
-            if (jwtDecoder instanceof NimbusJwtDecoder nimbusJwtDecoder) {
-                nimbusJwtDecoder.setJwtValidator(kakaoIdTokenValidator());
-            }
-            return jwtDecoder.decode(idToken);
-        } catch (JwtException e) {
+            return getJwtDecoder().decode(idToken);
+        } catch (RuntimeException e) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "카카오 ID 토큰 검증에 실패했습니다.");
+        }
+    }
+
+    private JwtDecoder getJwtDecoder() {
+        JwtDecoder currentDecoder = jwtDecoder;
+        if (currentDecoder != null) {
+            return currentDecoder;
+        }
+
+        synchronized (this) {
+            if (jwtDecoder == null) {
+                JwtDecoder decoder = JwtDecoders.fromIssuerLocation(properties.issuerUri());
+                if (decoder instanceof NimbusJwtDecoder nimbusJwtDecoder) {
+                    nimbusJwtDecoder.setJwtValidator(kakaoIdTokenValidator());
+                }
+                jwtDecoder = decoder;
+            }
+            return jwtDecoder;
         }
     }
 

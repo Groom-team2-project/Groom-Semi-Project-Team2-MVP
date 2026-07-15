@@ -85,7 +85,15 @@ public class MemberEntity extends BaseEntity {
     }
 
     public void updateProfile(String email, String nickname) {
-        this.email = email;
-        this.nickname = nickname;
+        if (email != null && !email.isBlank()) {
+            this.email = email;
+        }
+        if (nickname != null && !nickname.isBlank()) {
+            this.nickname = nickname;
+        }
+    }
+
+    public boolean isLoginAllowed() {
+        return status == MemberStatus.ACTIVE;
     }
 }
