@@ -44,28 +44,35 @@ class AuthMemberServiceConcurrencyTest {
         Queue<AuthMemberService.MemberLookupResult> results = new ConcurrentLinkedQueue<>();
         Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
 
-        for (int i = 0; i < threadCount; i++) {
-            executorService.submit(() -> {
-                readyLatch.countDown();
+        try {
+            for (int i = 0; i < threadCount; i++) {
+                executorService.submit(() -> {
+                    readyLatch.countDown();
 
-                try {
-                    startLatch.await();
-                    results.add(authMemberService.findOrCreateMember(userInfo));
-                } catch (Throwable throwable) {
-                    failures.add(throwable);
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
+                    try {
+                        startLatch.await();
+                        results.add(authMemberService.findOrCreateMember(userInfo));
+                    } catch (Throwable throwable) {
+                        failures.add(throwable);
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            assertThat(readyLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+            startLatch.countDown();
+
+            assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            startLatch.countDown();
+            executorService.shutdownNow();
+            if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                failures.add(new AssertionError("Executor did not terminate."));
+            }
         }
 
-        assertThat(readyLatch.await(5, TimeUnit.SECONDS)).isTrue();
-
-        startLatch.countDown();
-
-        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
-
-        executorService.shutdown();
 
         List<Long> memberIds = results.stream()
                 .map(result -> result.member().getMemberId())
