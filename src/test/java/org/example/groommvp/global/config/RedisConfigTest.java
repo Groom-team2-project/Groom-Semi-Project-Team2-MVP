@@ -13,7 +13,7 @@ class RedisConfigTest {
             .withUserConfiguration(RedisConfig.class)
             .withPropertyValues(
                     "redis.host=localhost",
-                    "redis.port=6379"
+                    "redis.port=1"
             );
 
     @Test
