@@ -119,7 +119,7 @@ public class StockEntity extends BaseEntity {
         if (quantity <= 0) {
             throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
         }
-        if (stocks < quantity) {
+        if (getAvailableStocks() < quantity) {
             throw new BusinessException(ErrorCode.OUT_OF_STOCK);
         }
         this.stocks -= quantity;

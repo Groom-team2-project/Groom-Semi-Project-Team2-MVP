@@ -86,4 +86,89 @@ class StockEntityReservationTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.OUT_OF_STOCK);
     }
+
+    @Test
+    @DisplayName("0개 또는 음수 수량은 예약할 수 없습니다")
+    void reserve_zeroOrNegativeQuantity_throwsException() {
+        ProductEntity product = ProductEntity.builder()
+                .productName("테스트 상품")
+                .productPrice(10000)
+                .build();
+        StockEntity stock = StockEntity.builder()
+                .product(product)
+                .stocks(10)
+                .build();
+
+        assertThatThrownBy(() -> stock.reserve(0))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_STOCK_QUANTITY);
+
+        assertThatThrownBy(() -> stock.reserve(-1))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_STOCK_QUANTITY);
+    }
+
+    @Test
+    @DisplayName("예약을 여러 번 호출하면 예약 재고가 누적됩니다")
+    void reserve_multipleTimes_accumulatesReservedStocks() {
+        ProductEntity product = ProductEntity.builder()
+                .productName("테스트 상품")
+                .productPrice(10000)
+                .build();
+        StockEntity stock = StockEntity.builder()
+                .product(product)
+                .stocks(10)
+                .build();
+
+        stock.reserve(3);
+        stock.reserve(2);
+
+        assertThat(stock.getStocks()).isEqualTo(10);
+        assertThat(stock.getReservedStocks()).isEqualTo(5);
+        assertThat(stock.getAvailableStocks()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("예약 수량보다 많이 해제할 수 없습니다")
+    void release_overReservedStocks_throwsException() {
+        ProductEntity product = ProductEntity.builder()
+                .productName("테스트 상품")
+                .productPrice(10000)
+                .build();
+        StockEntity stock = StockEntity.builder()
+                .product(product)
+                .stocks(10)
+                .build();
+        stock.reserve(3);
+
+        assertThatThrownBy(() -> stock.release(4))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_STOCK_QUANTITY);
+
+        assertThat(stock.getStocks()).isEqualTo(10);
+        assertThat(stock.getReservedStocks()).isEqualTo(3);
+        assertThat(stock.getAvailableStocks()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("예약 중인 재고를 제외한 판매 가능 재고보다 많이 차감할 수 없습니다")
+    void decrease_overAvailableStocks_throwsException() {
+        ProductEntity product = ProductEntity.builder()
+                .productName("테스트 상품")
+                .productPrice(10000)
+                .build();
+        StockEntity stock = StockEntity.builder()
+                .product(product)
+                .stocks(10)
+                .build();
+        stock.reserve(8);
+
+        assertThatThrownBy(() -> stock.decrease(5))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.OUT_OF_STOCK);
+
+        assertThat(stock.getStocks()).isEqualTo(10);
+        assertThat(stock.getReservedStocks()).isEqualTo(8);
+        assertThat(stock.getAvailableStocks()).isEqualTo(2);
+    }
 }
