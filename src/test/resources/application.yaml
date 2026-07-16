@@ -13,3 +13,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+redis:
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+
+app:
+  jwt:
+    secret: test-jwt-secret-key-for-auth-context
+    access-token-expiration-seconds: 7200

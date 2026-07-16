@@ -1,4 +1,7 @@
 spring:
+    profiles:
+        default: local
+
     datasource:
         driver-class-name: com.mysql.cj.jdbc.Driver
         url: ${SPRING_DATASOURCE_URL}
@@ -13,6 +16,10 @@ spring:
                 show_sql: true
                 format_sql: true
 
+redis:
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+
 springdoc:
     swagger-ui:
         path: /swagger-ui.html
@@ -20,3 +27,16 @@ springdoc:
         operations-sorter: method
     api-docs:
         path: /v3/api-docs
+
+kakao:
+    oauth:
+        client-id: ${KAKAO_CLIENT_ID:}
+        client-secret: ${KAKAO_CLIENT_SECRET:}
+        redirect-uri: ${KAKAO_REDIRECT_URI:}
+        token-uri: https://kauth.kakao.com/oauth/token
+        issuer-uri: https://kauth.kakao.com
+
+app:
+    jwt:
+        secret: ${JWT_SECRET}
+        access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:7200}
