@@ -9,7 +9,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,8 +17,6 @@ import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.global.entity.BaseEntity;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 /**
  * 상품의 현재 재고를 보관하는 엔티티. (테이블: stocks)
@@ -49,15 +46,60 @@ public class StockEntity extends BaseEntity {
     @Column(name = "stocks", nullable = false)
     private int stocks;
 
+    /** 결제 대기 중인 수량 **/
+    @Column(name = "reserved_stocks", nullable = false)
+    private int reservedStocks;
+
     @Builder
     public StockEntity(ProductEntity product, int stocks) {
         this.product = product;
         this.stocks = stocks;
+        this.reservedStocks = 0;
     }
 
     /** 상품의 최초 재고(0개) 레코드를 생성한다. */
     public static StockEntity init(ProductEntity product) {
         return StockEntity.builder().product(product).stocks(0).build();
+    }
+
+    // 실제 보유 재고 - 결제 대기 중 잡아둔 재고 = 새로 판매 가능한 재고
+    public int getAvailableStocks() {
+        return this.stocks - this.reservedStocks;
+    }
+
+    public void reserve(int quantity) {
+        if (quantity <= 0) {
+            // 0개 또는 음수는 예약할 수 없으므로 잘못된 요청
+            throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        if (getAvailableStocks() < quantity) {
+            // 지금 팔 수 있는 재고보다 많이 예약하려 하면 품절 처리
+            throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+        }
+        this.reservedStocks += quantity; // 실제 재고 stocks는 그대로 두고, 예약 재고만 증가
+    }
+
+    public void confirm(int quantity) {
+        if (quantity <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        if (this.reservedStocks < quantity) {
+            // 예약된 수량보다 더 많이 확정할 수는 없음
+            throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        this.reservedStocks -= quantity;
+        this.stocks -= quantity; // 실제로 판매되면 실제 재고도 줄임
+    }
+
+    // 결제 실패 또는 시간 초과로 예약된 재고를 다시 판매 가능 상태로 풀어주는 기능
+    public void release(int quantity) {
+        if (quantity <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        if (this.reservedStocks < quantity) {
+            throw new BusinessException(ErrorCode.INVALID_STOCK_QUANTITY);
+        }
+        this.reservedStocks -= quantity; // 예약 수량만 줄임
     }
 
     /**
