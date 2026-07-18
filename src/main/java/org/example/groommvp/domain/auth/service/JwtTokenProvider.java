@@ -17,7 +17,6 @@ import org.example.groommvp.domain.auth.dto.JwtClaims;
 import org.example.groommvp.domain.member.entity.AuthProvider;
 import org.example.groommvp.domain.member.entity.MemberEntity;
 import org.example.groommvp.domain.member.entity.MemberRole;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -82,7 +81,7 @@ public class JwtTokenProvider {
     private Map<String, Object> parsePayload(String token) {
         String[] parts = token.split("\\.");
 
-        if(parts.length != 3) {
+        if (parts.length != 3) {
             throw new IllegalArgumentException("유효하지 않은 JWT 포맷입니다.");
         }
 
@@ -90,7 +89,7 @@ public class JwtTokenProvider {
         String expectedSignature = sign(signingInput);
         String actualSignature = parts[2];
 
-        if(!MessageDigest.isEqual(
+        if (!MessageDigest.isEqual(
                 expectedSignature.getBytes(StandardCharsets.UTF_8),
                 actualSignature.getBytes(StandardCharsets.UTF_8)
         )) {
@@ -101,7 +100,7 @@ public class JwtTokenProvider {
             byte[] decodedPayload = Base64.getUrlDecoder().decode(parts[1]);
             return objectMapper.readValue(decodedPayload, new TypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
-            throw new IllegalArgumentException("유효하지 않은 JWT Payload입니다.");
+            throw new IllegalArgumentException("유효하지 않은 JWT Payload입니다.", e);
         }
     }
 
@@ -146,13 +145,12 @@ public class JwtTokenProvider {
         if (value instanceof Number number) {
             return number.longValue();
         }
+
         try {
             return Long.parseLong(String.valueOf(value));
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("JWT 숫자형 Claim이 유효하지 않습니다.");
+            throw new IllegalArgumentException("JWT 숫자형 Claim이 유효하지 않습니다.", e);
         }
-
-
     }
 
     private JwtClaims getClaims(String token) {
