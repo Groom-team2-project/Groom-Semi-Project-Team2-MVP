@@ -38,8 +38,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             JwtClaims claims = jwtTokenProvider.getValidClaims(token);
 
-            Authentication authentication = new UsernamePasswordAuthenticationToken(
+            AuthMember authMember = new AuthMember(
                     claims.memberId(),
+                    claims.role(),
+                    claims.provider()
+            );
+
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    authMember,
                     null,
                     List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name()))
             );
