@@ -36,7 +36,7 @@ public class Payment extends BaseEntity {
 	private Order order;
 
 	@Column(nullable = false)
-	private int amount;                 // 결제 금액
+	private Long amount;                // 결제 금액
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
@@ -49,7 +49,7 @@ public class Payment extends BaseEntity {
 	private LocalDateTime canceledAt;   // 환불/취소 시각
 
 	// 결제 생성 시 PENDING 상태로 시작
-	public Payment(Order order, int amount, String method) {
+	public Payment(Order order, Long amount, String method) {
 		this.order = order;
 		this.amount = amount;
 		this.method = method;
