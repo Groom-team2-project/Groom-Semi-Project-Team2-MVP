@@ -24,14 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 장바구니를 하나의 주문으로 전환하는 서비스. (E→C→D 구매 흐름의 시작점)
  *
- * <p>재고/주문 도메인(파트 C)의 <b>공개 빌딩블록</b>({@link StockEntity#decrease},
+ * <p>재고/주문 도메인(파트 C)의 <b>공개 빌딩블록</b>({@link StockEntity#reserve},
  * {@link Order}, {@link OrderItem}, {@link StockHistoryEntity})만 사용해 조립하며,
- * 해당 도메인 코드를 수정하지 않는다. 재고 차감은 기존 단건 구매({@code PurchaseService})와
+ * 해당 도메인 코드를 수정하지 않는다. 재고 예약은 기존 단건 구매({@code PurchaseService})와
  * 동일하게 상품별 비관적 락으로 처리한다.
  *
  * <p><b>인터페이스 합의 필요:</b> 기획서 §8에 따라 E→C→D 흐름은 파트 C/D 와 사전 합의가
- * 전제다. 현재 구현은 재고 "예약(reserved)" 도입 전의 즉시 차감 방식으로, 파트 C 의 예약
- * 모델이 확정되면 그에 맞춰 교체한다.
+ * 전제다. 현재 구현은 결제 전에는 재고를 즉시 차감하지 않고 예약한 뒤, 결제 성공/실패 흐름에서
+ * 확정 또는 해제되도록 연결하는 구조다.
  */
 @Service
 @RequiredArgsConstructor
@@ -56,7 +56,7 @@ public class CartOrderService {
             throw new BusinessException(ErrorCode.CART_EMPTY);
         }
 
-        // 1) 재고 차감 + 총액 계산 (상품별 비관적 락)
+        // 1) 재고 예약 + 총액 계산 (상품별 비관적 락)
         long totalPrice = 0L;
         List<Line> lines = new ArrayList<>();
         for (CartItemEntity item : items) {
@@ -66,7 +66,7 @@ public class CartOrderService {
             StockEntity stock = stockRepository
                     .findByProductIdWithPessimisticLock(product.getProductId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
-            stock.decrease(quantity);
+            stock.reserve(quantity);
 
             int orderPrice = product.getProductPrice();
             totalPrice += (long) orderPrice * quantity;
@@ -74,13 +74,13 @@ public class CartOrderService {
         }
 
         // 2) 단일 주문 생성 후 주문 항목/재고 이력 적재
-        Order order = orderRepository.save(new Order(totalPrice));
+        Order order = orderRepository.save(Order.pendingPayment(totalPrice));
         List<CartCheckoutResponse.OrderedItem> orderedItems = new ArrayList<>();
         for (Line line : lines) {
             orderItemRepository.save(
                     new OrderItem(order, line.product, line.quantity, line.orderPrice));
             stockHistoryRepository.save(
-                    StockHistoryEntity.decrease(line.stock, order.getId(), line.quantity, CART_ORDER_REASON));
+                    StockHistoryEntity.reserve(line.stock, order.getId(), line.quantity, CART_ORDER_REASON));
             orderedItems.add(new CartCheckoutResponse.OrderedItem(
                     line.product.getProductId(),
                     line.quantity,

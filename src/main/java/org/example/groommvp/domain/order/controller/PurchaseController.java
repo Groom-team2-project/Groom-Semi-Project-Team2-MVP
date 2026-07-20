@@ -35,9 +35,9 @@ public class PurchaseController {
         this.purchaseService = purchaseService;
     }
 
-    @Operation(summary = "상품 구매", description = "특정 상품을 지정한 수량만큼 구매합니다. 구매 성공 시 재고가 차감되고 주문이 생성됩니다.")
+    @Operation(summary = "상품 주문 생성", description = "특정 상품을 지정한 수량만큼 주문하고 재고를 예약합니다. 주문은 결제 대기 상태로 생성됩니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "구매 성공",
+            @ApiResponse(responseCode = "201", description = "주문 생성 및 재고 예약 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = SwaggerResponse.PurchaseCommonResponse.class),
                             examples = @ExampleObject(value = """
@@ -51,7 +51,7 @@ public class PurchaseController {
                                             "orderedAt": "2024-01-15T10:30:00"
                                         },
                                         "errorCode": null,
-                                        "message": "구매가 정상적으로 처리되었습니다."
+                                        "message": "주문이 정상적으로 생성되었으며, 재고 예약이 완료되었습니다. 결제를 진행해주세요."
                                     }
                                     """))),
             @ApiResponse(responseCode = "400", description = "입력값 유효성 검사 실패",
@@ -116,6 +116,6 @@ public class PurchaseController {
             @Valid @RequestBody PurchaseRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(CommonResponse.success(purchaseService.purchase(productId, request), "구매가 정상적으로 처리되었습니다."));
+                .body(CommonResponse.success(purchaseService.purchase(productId, request), "주문이 정상적으로 생성되었으며, 재고 예약이 완료되었습니다. 결제를 진행해주세요."));
     }
 }
