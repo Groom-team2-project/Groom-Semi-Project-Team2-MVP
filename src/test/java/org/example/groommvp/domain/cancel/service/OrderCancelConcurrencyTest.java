@@ -51,7 +51,7 @@ class OrderCancelConcurrencyTest {
         // given: 상품 / 재고(0) / 주문(COMPLETED) / 주문품목(2개) 준비
         ProductEntity product = productRepository.save(new ProductEntity("Test Product", 10000));
         stockRepository.save(new StockEntity(product, 0));                 // 취소 전 재고 0
-        Order order = orderRepository.save(new Order(20000));              // COMPLETED 주문
+        Order order = orderRepository.save(new Order(20000L));             // COMPLETED 주문
         orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 구매했던 품목
         Long orderId = order.getId();
 

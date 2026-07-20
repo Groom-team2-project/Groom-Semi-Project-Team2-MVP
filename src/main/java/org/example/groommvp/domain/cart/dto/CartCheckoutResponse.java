@@ -16,7 +16,7 @@ public record CartCheckoutResponse(
         @Schema(description = "주문된 상품 항목")
         List<OrderedItem> items,
         @Schema(description = "총 주문 금액", example = "12000")
-        int totalPrice,
+        Long totalPrice,
         @Schema(type = "string", description = "주문 생성 시각 (ISO-8601 LocalDateTime, 예: 2024-01-15T10:30:00)",
                 example = "2024-01-15T10:30:00")
         LocalDateTime orderedAt
