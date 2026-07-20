@@ -60,7 +60,7 @@ public class CartOrderService {
         }
 
         // 1) 재고 차감 + 총액 계산 (상품별 비관적 락)
-        int totalPrice = 0;
+        long totalPrice = 0L;
         List<Line> lines = new ArrayList<>();
         for (CartItemEntity item : items) {
             ProductEntity product = item.getProduct();
@@ -72,7 +72,7 @@ public class CartOrderService {
             stock.decrease(quantity);
 
             int orderPrice = product.getProductPrice();
-            totalPrice += orderPrice * quantity;
+            totalPrice += (long) orderPrice * quantity;
             lines.add(new Line(stock, product, quantity, orderPrice));
         }
 
