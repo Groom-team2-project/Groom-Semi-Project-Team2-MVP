@@ -2,9 +2,7 @@ package org.example.groommvp.domain.auth.service;
 
 import org.example.groommvp.domain.auth.client.KakaoOAuthClient;
 import org.example.groommvp.domain.auth.config.KakaoOAuthProperties;
-import org.example.groommvp.domain.auth.dto.KakaoAuthorizeUrlResponse;
-import org.example.groommvp.domain.auth.dto.KakaoUserInfo;
-import org.example.groommvp.domain.auth.dto.LoginResponse;
+import org.example.groommvp.domain.auth.dto.*;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
@@ -20,8 +18,8 @@ public class AuthService {
     private final KakaoOAuthProperties kakaoOAuthProperties;
     private final OAuthStateService oAuthStateService;
 
-    public LoginResponse loginWithKakao(String code, String redirectUri, String state) {
-        oAuthStateService.validateAndConsume(state);
+    public LoginResponse loginWithKakao(String code, String redirectUri, String state, String nonce) {
+        oAuthStateService.validateAndConsume(state, nonce);
 
         KakaoUserInfo userInfo = kakaoOAuthClient.getUserInfo(code, redirectUri);
 
@@ -38,18 +36,18 @@ public class AuthService {
         );
     }
 
-    public KakaoAuthorizeUrlResponse getKakaoAuthorizeUrl() {
-        String state = oAuthStateService.issueState();
+    public KakaoAuthorizeResult getKakaoAuthorizeUrl() {
+        OAuthState oAuthState = oAuthStateService.issueState();
 
         String url = UriComponentsBuilder
                 .fromUriString("https://kauth.kakao.com/oauth/authorize")
                 .queryParam("response_type", "code")
                 .queryParam("client_id", kakaoOAuthProperties.clientId())
                 .queryParam("redirect_uri", kakaoOAuthProperties.redirectUri())
-                .queryParam("state", state)
+                .queryParam("state", oAuthState.state())
                 .build()
                 .toUriString();
 
-        return new KakaoAuthorizeUrlResponse(url, state);
+        return new KakaoAuthorizeResult(url, oAuthState.state(), oAuthState.nonce());
     }
 }

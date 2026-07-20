@@ -2,13 +2,13 @@ package org.example.groommvp.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 
+import org.example.groommvp.domain.auth.dto.OAuthState;
 import org.example.groommvp.global.error.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,27 +34,31 @@ class OAuthStateServiceTest {
         when(redissonClient.<String>getBucket(startsWith(STATE_KEY_PREFIX))).thenReturn(bucket);
         OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
 
-        String state = oAuthStateService.issueState();
+        OAuthState oAuthState = oAuthStateService.issueState();
 
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> nonceCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
 
         verify(redissonClient).<String>getBucket(keyCaptor.capture());
-        verify(bucket).set(eq("valid"), ttlCaptor.capture());
+        verify(bucket).set(nonceCaptor.capture(), ttlCaptor.capture());
 
-        assertThat(state).isNotBlank();
-        assertThat(keyCaptor.getValue()).isEqualTo(STATE_KEY_PREFIX + state);
+        assertThat(oAuthState.state()).isNotBlank();
+        assertThat(oAuthState.nonce()).isNotBlank();
+        assertThat(keyCaptor.getValue()).isEqualTo(STATE_KEY_PREFIX + oAuthState.state());
+        assertThat(nonceCaptor.getValue()).isEqualTo(oAuthState.nonce());
         assertThat(ttlCaptor.getValue()).isEqualTo(Duration.ofMinutes(5));
     }
 
     @Test
     void validateAndConsumeSucceedsWhenStateExists() {
         String state = "valid-state";
+        String nonce = "valid-nonce";
         when(redissonClient.<String>getBucket(STATE_KEY_PREFIX + state)).thenReturn(bucket);
-        when(bucket.getAndDelete()).thenReturn("valid");
+        when(bucket.getAndDelete()).thenReturn(nonce);
         OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
 
-        oAuthStateService.validateAndConsume(state);
+        oAuthStateService.validateAndConsume(state, nonce);
 
         verify(bucket).getAndDelete();
     }
@@ -63,7 +67,15 @@ class OAuthStateServiceTest {
     void validateAndConsumeRejectsBlankState() {
         OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
 
-        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(" "))
+        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(" ", "nonce"))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void validateAndConsumeRejectsBlankNonce() {
+        OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
+
+        assertThatThrownBy(() -> oAuthStateService.validateAndConsume("state", " "))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -74,20 +86,32 @@ class OAuthStateServiceTest {
         when(bucket.getAndDelete()).thenReturn(null);
         OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
 
-        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(state))
+        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(state, "nonce"))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void validateAndConsumeRejectsMismatchedNonce() {
+        String state = "valid-state";
+        when(redissonClient.<String>getBucket(STATE_KEY_PREFIX + state)).thenReturn(bucket);
+        when(bucket.getAndDelete()).thenReturn("saved-nonce");
+        OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
+
+        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(state, "wrong-nonce"))
                 .isInstanceOf(BusinessException.class);
     }
 
     @Test
     void validateAndConsumeRejectsReusedState() {
         String state = "reused-state";
+        String nonce = "valid-nonce";
         when(redissonClient.<String>getBucket(STATE_KEY_PREFIX + state)).thenReturn(bucket);
-        when(bucket.getAndDelete()).thenReturn("valid", (String) null);
+        when(bucket.getAndDelete()).thenReturn(nonce, (String) null);
         OAuthStateService oAuthStateService = new OAuthStateService(redissonClient);
 
-        oAuthStateService.validateAndConsume(state);
+        oAuthStateService.validateAndConsume(state, nonce);
 
-        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(state))
+        assertThatThrownBy(() -> oAuthStateService.validateAndConsume(state, nonce))
                 .isInstanceOf(BusinessException.class);
     }
 }

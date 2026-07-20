@@ -9,7 +9,8 @@ import static org.mockito.Mockito.when;
 
 import org.example.groommvp.domain.auth.client.KakaoOAuthClient;
 import org.example.groommvp.domain.auth.config.KakaoOAuthProperties;
-import org.example.groommvp.domain.auth.dto.KakaoAuthorizeUrlResponse;
+import org.example.groommvp.domain.auth.dto.KakaoAuthorizeResult;
+import org.example.groommvp.domain.auth.dto.OAuthState;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,12 +58,13 @@ class AuthServiceTest {
 
     @Test
     void getKakaoAuthorizeUrlIncludesIssuedState() {
-        when(oAuthStateService.issueState()).thenReturn("issued-state");
+        when(oAuthStateService.issueState()).thenReturn(new OAuthState("issued-state", "issued-nonce"));
 
-        KakaoAuthorizeUrlResponse response = authService.getKakaoAuthorizeUrl();
+        KakaoAuthorizeResult response = authService.getKakaoAuthorizeUrl();
         UriComponents uriComponents = UriComponentsBuilder.fromUriString(response.url()).build();
 
         assertThat(response.state()).isEqualTo("issued-state");
+        assertThat(response.nonce()).isEqualTo("issued-nonce");
         assertThat(uriComponents.getQueryParams().getFirst("response_type")).isEqualTo("code");
         assertThat(uriComponents.getQueryParams().getFirst("client_id")).isEqualTo("kakao-client-id");
         assertThat(uriComponents.getQueryParams().getFirst("redirect_uri"))
@@ -74,12 +76,13 @@ class AuthServiceTest {
     void loginWithKakaoValidatesStateBeforeRequestingKakaoUserInfo() {
         doThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "Invalid OAuth state."))
                 .when(oAuthStateService)
-                .validateAndConsume("invalid-state");
+                .validateAndConsume("invalid-state", "invalid-nonce");
 
         assertThatThrownBy(() -> authService.loginWithKakao(
                 "authorization-code",
                 "http://localhost:8080/api/v1/auth/kakao/callback",
-                "invalid-state"
+                "invalid-state",
+                "invalid-nonce"
         )).isInstanceOf(BusinessException.class);
 
         verify(kakaoOAuthClient, never()).getUserInfo(

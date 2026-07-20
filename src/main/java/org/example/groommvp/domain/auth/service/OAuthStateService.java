@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.auth.dto.OAuthState;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.redisson.api.RBucket;
@@ -21,29 +22,30 @@ public class OAuthStateService {
 
     private final RedissonClient redissonClient;
 
-    public String issueState() {
-        String state = generateSecureState();
+    public OAuthState issueState() {
+        String state = generateSecureToken();
+        String nonce = generateSecureToken();
 
         RBucket<String> bucket = redissonClient.getBucket(STATE_KEY_PREFIX + state);
-        bucket.set("valid", STATE_TTL);
+        bucket.set(nonce, STATE_TTL);
 
-        return state;
+        return new OAuthState(state, nonce);
     }
 
-    public void validateAndConsume(String state) {
-        if (!StringUtils.hasText(state)) {
+    public void validateAndConsume(String state, String nonce) {
+        if (!StringUtils.hasText(state) || !StringUtils.hasText(nonce)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "OAuth State가 필요합니다.");
         }
 
         RBucket<String> bucket = redissonClient.getBucket(STATE_KEY_PREFIX + state);
 
-        String value = bucket.getAndDelete();
-        if (value == null) {
+        String savedNonce = bucket.getAndDelete();
+        if (savedNonce == null || !savedNonce.equals(nonce)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "유효하지 않거나 만료된 OAuth State입니다.");
         }
     }
 
-    private String generateSecureState() {
+    private String generateSecureToken() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
 
