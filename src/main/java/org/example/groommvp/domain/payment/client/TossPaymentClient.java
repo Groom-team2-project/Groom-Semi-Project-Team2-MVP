@@ -25,7 +25,7 @@ public class TossPaymentClient {
 		this.restClient = RestClient.create();
 	}
 
-	public void confirm(String paymentKey, String orderId, int amount) {
+	public void confirm(String paymentKey, String orderId, Long amount) {
 		String encodedAuth = Base64.getEncoder()
 			.encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
 

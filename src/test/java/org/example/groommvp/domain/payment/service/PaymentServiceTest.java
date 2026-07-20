@@ -37,7 +37,7 @@ public class PaymentServiceTest {
 	void pay_success() {
 		// given
 		Long orderId = 1L;
-		Order order = order(orderId, 20000);
+		Order order = order(orderId, 20000L);
 
 		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
 		given(paymentRepository.existsByOrder(order)).willReturn(false);
@@ -49,7 +49,7 @@ public class PaymentServiceTest {
 		// then
 		assertThat(response.status()).isEqualTo(PaymentStatus.PAID);
 		assertThat(response.paidAt()).isNotNull();
-		verify(tossPaymentClient).confirm("test_pk_123", "1", 20000);  // 서버 금액으로 승인 요청했는지
+		verify(tossPaymentClient).confirm("test_pk_123", "1", 20000L);  // 서버 금액으로 승인 요청했는지
 		verify(paymentRepository).saveAndFlush(any(Payment.class));
 	}
 
@@ -58,7 +58,7 @@ public class PaymentServiceTest {
 	void pay_alreadyExists() {
 		// given
 		Long orderId = 1L;
-		Order order = order(orderId, 20000);
+		Order order = order(orderId, 20000L);
 		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
 		given(paymentRepository.existsByOrder(order)).willReturn(true);
 
@@ -68,10 +68,10 @@ public class PaymentServiceTest {
 			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ALREADY_EXISTS);
 
 		// 사전 체크에서 막혀 토스 승인은 호출되지 않아야 한다
-		verify(tossPaymentClient, never()).confirm(any(), any(), anyInt());
+		verify(tossPaymentClient, never()).confirm(any(), any(), anyLong());
 	}
 
-	private Order order(Long id, int totalPrice) {
+	private Order order(Long id, Long totalPrice) {
 		Order o = new Order(totalPrice);
 		org.springframework.test.util.ReflectionTestUtils.setField(o, "id", id);
 		return o;
