@@ -94,7 +94,11 @@ class JwtAuthenticationFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(MockHttpServletResponse.SC_OK);
         assertThat(authentication).isNotNull();
-        assertThat(authentication.getPrincipal()).isEqualTo(1L);
+        assertThat(authentication.getPrincipal()).isInstanceOf(AuthMember.class);
+        AuthMember authMember = (AuthMember) authentication.getPrincipal();
+        assertThat(authMember.memberId()).isEqualTo(1L);
+        assertThat(authMember.role()).isEqualTo(MemberRole.USER);
+        assertThat(authMember.provider()).isEqualTo(AuthProvider.KAKAO);
         assertThat(authentication.getAuthorities())
                 .extracting("authority")
                 .containsExactly("ROLE_USER");
