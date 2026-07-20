@@ -13,8 +13,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -42,11 +40,33 @@ public class Order extends BaseEntity {
     private LocalDateTime canceledAt;
 
     public Order(int totalPrice) {
+        this(totalPrice, OrderStatus.COMPLETED);
+    }
+
+    private Order(int totalPrice, OrderStatus status) {
         if (totalPrice < 0) {
             throw new IllegalArgumentException("주문 금액은 0 이상이어야 합니다.");
         }
-        this.status = OrderStatus.COMPLETED;
         this.totalPrice = totalPrice;
+        this.status = status;
+    }
+
+    public static Order pendingPayment(int totalPrice) {
+        return new Order(totalPrice, OrderStatus.PENDING_PAYMENT);
+    }
+
+    public void completePayment() {
+        if (this.status != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_CANCELABLE);
+        }
+        this.status = OrderStatus.COMPLETED;
+    }
+
+    public void failPayment() {
+        if (this.status != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(ErrorCode.ORDER_NOT_CANCELABLE);
+        }
+        this.status = OrderStatus.PAYMENT_FAILED;
     }
 
     public void cancel() {
