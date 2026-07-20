@@ -11,7 +11,7 @@ import lombok.Builder;
 public record PaymentResponse(
 	Long paymentId,
 	Long orderId,
-	int amount,
+	Long amount,
 	PaymentStatus status,
 	LocalDateTime paidAt
 ) {

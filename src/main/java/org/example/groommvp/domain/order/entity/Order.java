@@ -44,6 +44,10 @@ public class Order extends BaseEntity {
     }
 
     private Order(Long totalPrice, OrderStatus status) {
+        if (totalPrice == null) {
+            throw new IllegalArgumentException("주문 금액은 필수입니다.");
+        }
+
         if (totalPrice < 0) {
             throw new IllegalArgumentException("주문 금액은 0 이상이어야 합니다.");
         }
