@@ -9,7 +9,7 @@ public enum OrderStatus {
     CANCELED, // 사용자가 취소한 상태
     PAYMENT_FAILED; // 결제 시도는 했지만 실패한 상태
 
-    // 취소 가능 여부 (COMPLETED일 때만 가능)
+    // 취소 가능 여부 (COMPLETED 또는 PENDING_PAYMENT일 때 가능)
     public boolean isCancelable() {
         return this == COMPLETED || this == PENDING_PAYMENT;
     }
@@ -19,7 +19,7 @@ public enum OrderStatus {
         return this == CANCELED;
     }
 
-    // 아직 결제가 완료되지 않은 주문인지 확인
+    // 결제 대기 상태(PENDING_PAYMENT)인지 확인 (결제 실패(PAYMENT_FAILED)는 포함하지 않음)
     public boolean isPendingPayment() {
         return this == PENDING_PAYMENT;
     }
