@@ -22,3 +22,7 @@ app:
   jwt:
     secret: test-jwt-secret-key-for-auth-context
     access-token-expiration-seconds: 7200
+
+toss:
+  secret-key: test-dummy-secret-key
+  confirm-url: http://localhost:8080/toss/confirm
