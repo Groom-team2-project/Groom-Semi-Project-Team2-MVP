@@ -14,7 +14,7 @@ public record OrderResponse(
         @Schema(description = "주문 상태 (COMPLETED: 구매 완료, CANCELED: 취소됨)", example = "COMPLETED")
         OrderStatus status,
         @Schema(description = "총 주문 금액", example = "7500000")
-        int totalPrice,
+        Long totalPrice,
         @Schema(type = "string", description = "주문 취소 시각 (취소되지 않은 주문은 null)", nullable = true, example = "2024-01-15T11:00:00")
         LocalDateTime canceledAt,
         @Schema(type = "string", description = "주문 생성 시각", example = "2024-01-15T10:30:00")

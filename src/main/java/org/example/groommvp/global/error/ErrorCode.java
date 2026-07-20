@@ -33,7 +33,8 @@ public enum ErrorCode {
 
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제를 찾을 수 없습니다."),
     PAYMENT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 결제된 주문입니다."),
-    PAYMENT_NOT_REFUNDABLE(HttpStatus.CONFLICT, "환불할 수 없는 결제 상태입니다.");
+    PAYMENT_NOT_REFUNDABLE(HttpStatus.CONFLICT, "환불할 수 없는 결제 상태입니다."),
+    PAYMENT_NOT_PENDING(HttpStatus.CONFLICT, "결제 대기 상태의 주문이 아닙니다.");
 
     private final HttpStatus status;
     private final String message;

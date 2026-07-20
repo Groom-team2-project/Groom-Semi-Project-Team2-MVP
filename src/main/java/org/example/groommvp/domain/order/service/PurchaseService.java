@@ -44,7 +44,7 @@ public class PurchaseService {
         stock.decrease(quantity);
 
         int orderPrice = product.getProductPrice();
-        int totalPrice = orderPrice * quantity;
+        long totalPrice = (long) orderPrice * quantity;
         Order order = orderRepository.save(new Order(totalPrice));
         orderItemRepository.save(new OrderItem(order, product, quantity, orderPrice));
         stockHistoryRepository.save(StockHistoryEntity.decrease(stock, order.getId(), quantity, PURCHASE_REASON));
