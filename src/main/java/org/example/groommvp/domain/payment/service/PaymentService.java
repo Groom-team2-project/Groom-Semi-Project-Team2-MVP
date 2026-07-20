@@ -33,7 +33,7 @@ public class PaymentService {
 		}
 
 		// 결제 생성 (PENDING)
-		Payment payment = new Payment(order, order.getTotalPrice(), request.method());
+		Payment payment = new Payment(order, Math.toIntExact(order.getTotalPrice()), request.method());
 
 		// (모의) 결제 승인 (PENDING -> PAID)
 		payment.pay();

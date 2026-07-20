@@ -113,7 +113,7 @@ class OrderCancelServiceTest {
 	}
 
 	private Order order(Long id) {
-		Order order = new Order(20000);
+		Order order = new Order(20000L);
 		ReflectionTestUtils.setField(order, "id", id);
 		return order;
 	}
