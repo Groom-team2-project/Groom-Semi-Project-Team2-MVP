@@ -18,8 +18,11 @@ public class AuthService {
     private final AuthMemberService authMemberService;
     private final JwtTokenProvider jwtTokenProvider;
     private final KakaoOAuthProperties kakaoOAuthProperties;
+    private final OAuthStateService oAuthStateService;
 
-    public LoginResponse loginWithKakao(String code, String redirectUri) {
+    public LoginResponse loginWithKakao(String code, String redirectUri, String state) {
+        oAuthStateService.validateAndConsume(state);
+
         KakaoUserInfo userInfo = kakaoOAuthClient.getUserInfo(code, redirectUri);
 
         AuthMemberService.MemberLookupResult lookupResult = authMemberService.findOrCreateMember(userInfo);
@@ -36,14 +39,17 @@ public class AuthService {
     }
 
     public KakaoAuthorizeUrlResponse getKakaoAuthorizeUrl() {
+        String state = oAuthStateService.issueState();
+
         String url = UriComponentsBuilder
                 .fromUriString("https://kauth.kakao.com/oauth/authorize")
                 .queryParam("response_type", "code")
                 .queryParam("client_id", kakaoOAuthProperties.clientId())
                 .queryParam("redirect_uri", kakaoOAuthProperties.redirectUri())
+                .queryParam("state", state)
                 .build()
                 .toUriString();
 
-        return new KakaoAuthorizeUrlResponse(url);
+        return new KakaoAuthorizeUrlResponse(url, state);
     }
 }

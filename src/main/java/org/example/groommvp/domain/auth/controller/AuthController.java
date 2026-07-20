@@ -29,7 +29,11 @@ public class AuthController {
     public ResponseEntity<CommonResponse<LoginResponse>> loginWithKakao(
             @Valid @RequestBody KakaoLoginRequest request
     ) {
-        LoginResponse response = authService.loginWithKakao(request.code(), request.redirectUri());
+        LoginResponse response = authService.loginWithKakao(
+                request.code(),
+                request.redirectUri(),
+                request.state()
+        );
         return ResponseEntity.ok(CommonResponse.success(response, "카카오 로그인 성공"));
     }
 
@@ -49,11 +53,13 @@ public class AuthController {
      */
     @GetMapping("/kakao/callback")
     public ResponseEntity<CommonResponse<LoginResponse>> kakaoCallback(
-            @RequestParam String code
+            @RequestParam String code,
+            @RequestParam String state
     ) {
         LoginResponse response = authService.loginWithKakao(
                 code,
-                kakaoOAuthProperties.redirectUri()
+                kakaoOAuthProperties.redirectUri(),
+                state
         );
 
         return ResponseEntity.ok(
