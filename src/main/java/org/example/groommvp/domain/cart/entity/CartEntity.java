@@ -3,10 +3,13 @@ package org.example.groommvp.domain.cart.entity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +18,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.example.groommvp.domain.member.entity.MemberEntity;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.global.entity.BaseEntity;
 
@@ -24,9 +28,8 @@ import org.example.groommvp.global.entity.BaseEntity;
  * <p>장바구니 항목({@link CartItemEntity})의 애그리거트 루트로, 항목 추가/삭제는
  * 이 엔티티를 통해 수행하여 컬렉션 일관성을 유지한다.
  *
- * <p><b>회원 참조:</b> 회원(member) 도메인은 파트 A 담당이라 아직 없으므로,
- * FK 대신 {@code member_id} 컬럼(Long)으로 소유자를 식별한다. 파트 A 완성 후
- * 연관관계로 승격할 수 있다.
+ * <p><b>회원 참조:</b> 회원({@link MemberEntity})과 1:1. FK 컬럼은 {@code member_id}
+ * 이며 회원당 1개(unique)로 제한한다.
  *
  * <p><b>네이밍 컨벤션:</b> 자바 필드는 camelCase, DB 컬럼은 snake_case 이며,
  * 컬럼명은 {@code @Column(name = "...")} 으로 명시한다. (팀 컨벤션)
@@ -42,27 +45,28 @@ public class CartEntity extends BaseEntity {
     @Column(name = "cart_id")
     private Long cartId;
 
-    /** 장바구니 소유 회원 ID. 회원 1인당 1개(unique). */
-    @Column(name = "member_id", nullable = false, unique = true)
-    private Long memberId;
+    /** 장바구니 소유 회원 (1:1). FK 컬럼은 member_id, 회원당 1개(unique). */
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "member_id", nullable = false, unique = true)
+    private MemberEntity member;
 
     /** 장바구니 항목 목록. 장바구니 삭제 시 함께 삭제되고, 컬렉션에서 제거되면 고아 삭제된다. */
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<CartItemEntity> items = new ArrayList<>();
 
     @Builder
-    public CartEntity(Long memberId) {
-        this.memberId = memberId;
+    public CartEntity(MemberEntity member) {
+        this.member = member;
     }
 
     /** 회원의 빈 장바구니를 생성한다. */
-    public static CartEntity init(Long memberId) {
-        return CartEntity.builder().memberId(memberId).build();
+    public static CartEntity init(MemberEntity member) {
+        return CartEntity.builder().member(member).build();
     }
 
     /** 이 장바구니의 소유자인지 확인한다. */
     public boolean isOwnedBy(Long memberId) {
-        return this.memberId.equals(memberId);
+        return this.member.getMemberId().equals(memberId);
     }
 
     /** 상품 ID로 담긴 항목을 찾는다. */
