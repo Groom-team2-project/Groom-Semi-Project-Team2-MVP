@@ -3,11 +3,13 @@ package org.example.groommvp.domain.auth.controller;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.example.groommvp.domain.auth.config.KakaoOAuthProperties;
+import org.example.groommvp.domain.auth.config.OAuthCookieProperties;
 import org.example.groommvp.domain.auth.dto.KakaoAuthorizeResult;
 import org.example.groommvp.domain.auth.dto.LoginResponse;
 import org.example.groommvp.domain.auth.service.AuthService;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -37,7 +40,7 @@ class AuthControllerTest {
                 "https://kauth.kakao.com/oauth/token",
                 "https://kauth.kakao.com"
         );
-        AuthController authController = new AuthController(authService, properties);
+        AuthController authController = new AuthController(authService, properties, new OAuthCookieProperties(true));
         mockMvc = MockMvcBuilders.standaloneSetup(authController).build();
     }
 
@@ -50,9 +53,42 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(cookie().value("oauth_nonce", "nonce"))
                 .andExpect(cookie().httpOnly("oauth_nonce", true))
+                .andExpect(cookie().secure("oauth_nonce", true))
                 .andExpect(cookie().maxAge("oauth_nonce", 300))
                 .andExpect(jsonPath("$.data.url").value("https://kauth.kakao.com/oauth/authorize?state=state"))
                 .andExpect(jsonPath("$.data.state").value("state"));
+    }
+
+    @Test
+    void loginPassesCookieNonceThenExpiresCookie() throws Exception {
+        when(authService.loginWithKakao(
+                "code",
+                "http://localhost:8080/api/v1/auth/kakao/callback",
+                "state",
+                "nonce"
+        )).thenReturn(new LoginResponse("Bearer", "access-token", 7200L, 1L, MemberRole.USER, false));
+
+        mockMvc.perform(post("/api/v1/auth/kakao/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "code": "code",
+                                  "redirectUri": "http://localhost:8080/api/v1/auth/kakao/callback",
+                                  "state": "state"
+                                }
+                                """)
+                        .cookie(new jakarta.servlet.http.Cookie("oauth_nonce", "nonce")))
+                .andExpect(status().isOk())
+                .andExpect(cookie().maxAge("oauth_nonce", 0))
+                .andExpect(cookie().secure("oauth_nonce", true))
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"));
+
+        verify(authService).loginWithKakao(
+                "code",
+                "http://localhost:8080/api/v1/auth/kakao/callback",
+                "state",
+                "nonce"
+        );
     }
 
     @Test
@@ -70,6 +106,7 @@ class AuthControllerTest {
                         .cookie(new jakarta.servlet.http.Cookie("oauth_nonce", "nonce")))
                 .andExpect(status().isOk())
                 .andExpect(cookie().maxAge("oauth_nonce", 0))
+                .andExpect(cookie().secure("oauth_nonce", true))
                 .andExpect(jsonPath("$.data.accessToken").value("access-token"));
 
         verify(authService).loginWithKakao(

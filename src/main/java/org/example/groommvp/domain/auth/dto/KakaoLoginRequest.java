@@ -7,8 +7,6 @@ public record KakaoLoginRequest(
         String code,
         String redirectUri,
         @NotBlank
-        String state,
-        @NotBlank
-        String nonce
+        String state
 ) {
 }
