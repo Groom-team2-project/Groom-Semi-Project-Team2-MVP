@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.auth.service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -9,9 +10,13 @@ import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.groommvp.domain.auth.config.JwtProperties;
+import org.example.groommvp.domain.auth.dto.JwtClaims;
+import org.example.groommvp.domain.member.entity.AuthProvider;
 import org.example.groommvp.domain.member.entity.MemberEntity;
+import org.example.groommvp.domain.member.entity.MemberRole;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -71,5 +76,94 @@ public class JwtTokenProvider {
         } catch (Exception e) {
             throw new IllegalStateException("JWT 서명에 실패했습니다.", e);
         }
+    }
+
+    private Map<String, Object> parsePayload(String token) {
+        String[] parts = token.split("\\.");
+
+        if (parts.length != 3) {
+            throw new IllegalArgumentException("유효하지 않은 JWT 포맷입니다.");
+        }
+
+        String signingInput = parts[0] + "." + parts[1];
+        String expectedSignature = sign(signingInput);
+        String actualSignature = parts[2];
+
+        if (!MessageDigest.isEqual(
+                expectedSignature.getBytes(StandardCharsets.UTF_8),
+                actualSignature.getBytes(StandardCharsets.UTF_8)
+        )) {
+            throw new IllegalArgumentException("유효하지 않은 JWT 서명입니다.");
+        }
+
+        try {
+            byte[] decodedPayload = Base64.getUrlDecoder().decode(parts[1]);
+            return objectMapper.readValue(decodedPayload, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            throw new IllegalArgumentException("유효하지 않은 JWT Payload입니다.", e);
+        }
+    }
+
+    public JwtClaims getValidClaims(String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("JWT 토큰이 비어있습니다.");
+        }
+        Map<String, Object> payload = parsePayload(token);
+        JwtClaims claims = toJwtClaims(payload);
+
+        if (!claims.expiresAt().isAfter(Instant.now())) {
+            throw new IllegalArgumentException("JWT 토큰이 만료되었습니다.");
+        }
+
+        return claims;
+    }
+
+    private JwtClaims toJwtClaims(Map<String, Object> payload) {
+        return new JwtClaims(
+                Long.valueOf(String.valueOf(payload.get("sub"))),
+                MemberRole.valueOf(String.valueOf(payload.get("role"))),
+                AuthProvider.valueOf(String.valueOf(payload.get("provider"))),
+                Instant.ofEpochSecond(toLong(payload.get("iat"))),
+                Instant.ofEpochSecond(toLong(payload.get("exp")))
+        );
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            getValidClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            throw new IllegalArgumentException("JWT 숫자형 Claim이 비어있습니다.");
+        }
+
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("JWT 숫자형 Claim이 유효하지 않습니다.", e);
+        }
+    }
+
+    private JwtClaims getClaims(String token) {
+        Map<String, Object> payload = parsePayload(token);
+
+        return toJwtClaims(payload);
+    }
+
+    public Long getMemberId(String token) {
+        return getValidClaims(token).memberId();
+    }
+
+    public MemberRole getRole(String token) {
+        return getValidClaims(token).role();
     }
 }
