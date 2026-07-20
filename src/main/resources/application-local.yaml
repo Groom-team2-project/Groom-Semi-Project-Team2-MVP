@@ -21,3 +21,5 @@ redis:
 app:
     jwt:
         secret: ${JWT_SECRET:local-dev-jwt-secret-key-change-before-deploy}
+    oauth:
+        cookie-secure: ${OAUTH_COOKIE_SECURE:false}

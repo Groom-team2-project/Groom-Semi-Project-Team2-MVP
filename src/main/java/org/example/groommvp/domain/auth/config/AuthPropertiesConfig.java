@@ -6,7 +6,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties({
         KakaoOAuthProperties.class,
-        JwtProperties.class
+        JwtProperties.class,
+        OAuthCookieProperties.class
 })
 public class AuthPropertiesConfig {
 }

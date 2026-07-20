@@ -40,3 +40,5 @@ app:
     jwt:
         secret: ${JWT_SECRET}
         access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:7200}
+    oauth:
+        cookie-secure: ${OAUTH_COOKIE_SECURE:true}
