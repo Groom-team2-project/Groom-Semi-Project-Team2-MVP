@@ -28,16 +28,17 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 등록",
-            description = "로그인한 회원이 상품 리뷰를 등록합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            description = "로그인한 회원이 상품 리뷰를 등록합니다."
     )
     @PostMapping("/reviews")
     public ResponseEntity<CommonResponse<ReviewResponse>> createReview(
-            @AuthenticationPrincipal AuthMember authMember,
+            //@AuthenticationPrincipal AuthMember authMember,  auth 연결후 주석 제거 예정
+            @RequestParam Long memberId,
             @Valid @RequestBody ReviewRequest request
     ) {
         ReviewResponse response =
-                reviewService.createReview(request, authMember.memberId());
+                //reviewService.createReview(request, authMember.memberId());
+                reviewService.createReview(request, memberId);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "리뷰 등록 성공"));
@@ -79,19 +80,19 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 수정",
-            description = "본인이 작성한 리뷰의 내용과 평점을 수정합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            description = "본인이 작성한 리뷰의 내용과 평점을 수정합니다."
     )
     @PutMapping("/reviews/{reviewId}")
     public ResponseEntity<CommonResponse<ReviewResponse>> updateReview(
-            @AuthenticationPrincipal AuthMember authMember,
+            //@AuthenticationPrincipal AuthMember authMember, , auth 연결후 주석 제거 예정
+            @RequestParam Long memberId,
             @Parameter(description = "리뷰 ID", example = "1")
             @PathVariable Long reviewId,
             @Valid @RequestBody ReviewUpdateRequest request
     ) {
         ReviewResponse response = reviewService.updateReview(
                 reviewId,
-                authMember.memberId(),
+                memberId, // authMember.memberId(),
                 request
         );
 
@@ -102,18 +103,19 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 삭제",
-            description = "본인이 작성한 리뷰를 삭제합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            description = "본인이 작성한 리뷰를 삭제합니다."
     )
     @DeleteMapping("/reviews/{reviewId}")
     public ResponseEntity<Void> deleteReview(
-            @AuthenticationPrincipal AuthMember authMember,
+            //@AuthenticationPrincipal AuthMember authMember, auth 연결후 주석 제거 예정
+            @RequestParam Long memberId,
             @Parameter(description = "리뷰 ID", example = "1")
             @PathVariable Long reviewId
     ) {
         reviewService.deleteReview(
                 reviewId,
-                authMember.memberId()
+                memberId //authMember.memberId()
+
         );
 
         return ResponseEntity.noContent().build();
