@@ -2,11 +2,9 @@ package org.example.groommvp.domain.review.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.example.groommvp.domain.auth.security.AuthMember;
 import org.example.groommvp.domain.review.dto.ReviewRequest;
 import org.example.groommvp.domain.review.dto.ReviewResponse;
 import org.example.groommvp.domain.review.dto.ReviewUpdateRequest;
@@ -14,7 +12,6 @@ import org.example.groommvp.domain.review.service.ReviewService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,12 +25,12 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 등록",
-            description = "로그인한 회원이 상품 리뷰를 등록합니다."
+            description = "상품 리뷰를 등록합니다."
     )
     @PostMapping("/reviews")
     public ResponseEntity<CommonResponse<ReviewResponse>> createReview(
             //@AuthenticationPrincipal AuthMember authMember,  auth 연결후 주석 제거 예정
-            @RequestParam Long memberId,
+            @RequestParam(name = "memberId") Long memberId,
             @Valid @RequestBody ReviewRequest request
     ) {
         ReviewResponse response =

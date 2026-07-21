@@ -6,8 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.groommvp.global.entity.BaseEntity;
-
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 
@@ -33,12 +31,6 @@ public class ReviewEntity extends BaseEntity {
 
     @Column(name = "rating")
     private Integer rating;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
