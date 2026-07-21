@@ -37,27 +37,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authorization.substring(BEARER_PREFIX.length());
 
+        JwtClaims claims;
         try {
-            JwtClaims claims = jwtTokenProvider.getValidClaims(token);
-
-            AuthMember authMember = new AuthMember(
-                    claims.memberId(),
-                    claims.role(),
-                    claims.provider()
-            );
-
-            Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    authMember,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name()))
-            );
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            filterChain.doFilter(request, response);
+            claims = jwtTokenProvider.getValidClaims(token);
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
             SecurityErrorResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
+            return;
         }
+
+        AuthMember authMember = new AuthMember(
+                claims.memberId(),
+                claims.role(),
+                claims.provider()
+        );
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                authMember,
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name()))
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        filterChain.doFilter(request, response);
     }
 }

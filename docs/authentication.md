@@ -177,7 +177,7 @@ Authorization: Bearer {accessToken}
 
 JWT 필터는 다음 순서로 동작합니다.
 
-1. `Authorization` header가 없거나 `Bearer ` 형식이 아니면 다음 필터로 넘깁니다.
+1. `Authorization` header가 없거나 `Bearer` 형식이 아니면 다음 필터로 넘깁니다.
 2. Bearer token이 있으면 JWT 서명과 만료 시간을 검증합니다.
 3. JWT payload에서 `memberId`, `role`, `provider`를 읽습니다.
 4. `AuthMember`를 `AuthenticationPrincipal`로 등록합니다.
@@ -216,7 +216,6 @@ Example response when a protected API is called without a token:
 ```json
 {
   "success": false,
-  "data": null,
   "errorCode": "UNAUTHORIZED",
   "message": "인증이 필요합니다."
 }
@@ -227,7 +226,6 @@ Example response when an invalid token is provided:
 ```json
 {
   "success": false,
-  "data": null,
   "errorCode": "INVALID_TOKEN",
   "message": "유효하지 않은 토큰입니다."
 }
