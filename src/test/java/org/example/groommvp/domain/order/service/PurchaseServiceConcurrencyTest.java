@@ -55,7 +55,7 @@ public class PurchaseServiceConcurrencyTest {
 
     @Test
     @DisplayName("상품은 총 N개 있다고 할 때, N명의 사용자가 1번씩 동시에 주문할 경우 정확하게 N개의 주문만 생성된다")
-    void concurrentPurchaseDecreaseStockExactly() throws InterruptedException {
+    void concurrentPurchaseReservesStockExactly() throws InterruptedException {
         ProductEntity product = productRepository.save(
                 new ProductEntity("Test Product", 10000)
         );
@@ -102,7 +102,9 @@ public class PurchaseServiceConcurrencyTest {
         StockEntity savedStock = stockRepository.findAll().getFirst();
 
         assertThat(successCount.get()).isEqualTo(100);
-        assertThat(savedStock.getStocks()).isZero();
+        assertThat(savedStock.getStocks()).isEqualTo(100);
+        assertThat(savedStock.getReservedStocks()).isEqualTo(100);
+        assertThat(savedStock.getAvailableStocks()).isZero();
         assertThat(orderRepository.count()).isEqualTo(100);
         assertThat(orderItemRepository.count()).isEqualTo(100);
         assertThat(stockHistoryRepository.count()).isEqualTo(100);
@@ -159,7 +161,9 @@ public class PurchaseServiceConcurrencyTest {
 
         assertThat(successCount.get()).isEqualTo(30);
         assertThat(failCount.get()).isEqualTo(70);
-        assertThat(savedStock.getStocks()).isZero();
+        assertThat(savedStock.getStocks()).isEqualTo(30);
+        assertThat(savedStock.getReservedStocks()).isEqualTo(30);
+        assertThat(savedStock.getAvailableStocks()).isZero();
         assertThat(orderRepository.count()).isEqualTo(30);
         assertThat(orderItemRepository.count()).isEqualTo(30);
         assertThat(stockHistoryRepository.count()).isEqualTo(30);

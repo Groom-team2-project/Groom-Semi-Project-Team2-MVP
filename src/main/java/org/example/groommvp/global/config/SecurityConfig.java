@@ -2,7 +2,7 @@ package org.example.groommvp.global.config;
 
 import org.example.groommvp.domain.auth.security.JwtAuthenticationFilter;
 import org.example.groommvp.domain.auth.service.JwtTokenProvider;
-import org.springframework.http.HttpStatus;
+import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -25,7 +25,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
-                                response.setStatus(HttpStatus.UNAUTHORIZED.value()))
+                                SecurityErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
