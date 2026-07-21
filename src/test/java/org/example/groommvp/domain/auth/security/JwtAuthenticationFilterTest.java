@@ -116,6 +116,10 @@ class JwtAuthenticationFilterTest {
         jwtAuthenticationFilter.doFilter(request, response, filterChain);
 
         assertThat(response.getStatus()).isEqualTo(MockHttpServletResponse.SC_UNAUTHORIZED);
+        assertThat(response.getContentType()).contains("application/json");
+        assertThat(response.getContentAsString()).contains("\"success\":false");
+        assertThat(response.getContentAsString()).contains("\"errorCode\":\"INVALID_TOKEN\"");
+        assertThat(response.getContentAsString()).contains("\"message\":\"유효하지 않은 토큰입니다.\"");
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 }
