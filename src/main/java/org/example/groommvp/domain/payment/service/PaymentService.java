@@ -1,7 +1,15 @@
 package org.example.groommvp.domain.payment.service;
 
+import java.util.List;
+
 import org.example.groommvp.domain.order.entity.Order;
+import org.example.groommvp.domain.order.entity.OrderItem;
 import org.example.groommvp.domain.order.repository.OrderRepository;
+import org.example.groommvp.domain.order.repository.OrderItemRepository;
+import org.example.groommvp.domain.stock.entity.StockEntity;
+import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
+import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
+import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.domain.payment.client.TossPaymentClient;
 import org.example.groommvp.domain.payment.dto.PaymentRequest;
 import org.example.groommvp.domain.payment.dto.PaymentResponse;
@@ -22,7 +30,10 @@ public class PaymentService {
 
 	private final PaymentRepository paymentRepository;
 	private final OrderRepository orderRepository;
+	private final OrderItemRepository orderItemRepository;
 	private final TossPaymentClient tossPaymentClient;
+	private final StockRepository stockRepository;
+	private final StockHistoryRepository stockHistoryRepository;
 
 	@Transactional
 	public PaymentResponse pay(Long orderId, PaymentRequest request) {
@@ -38,6 +49,10 @@ public class PaymentService {
 		// 토스 결제 승인
 		tossPaymentClient.confirm(request.paymentKey(), String.valueOf(orderId), order.getTotalPrice());
 
+		List<OrderItem> orderItems = orderItemRepository.findByOrderIdWithProduct(orderId);
+		confirmReservedStocks(order, orderItems);
+		order.completePayment();
+
 		// 결제 생성 (PENDING)
 		Payment payment = new Payment(order, order.getTotalPrice(), request.method());
 
@@ -51,5 +66,20 @@ public class PaymentService {
 			throw new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS);
 		}
 		return PaymentResponse.from(payment);
+	}
+
+	private void confirmReservedStocks(Order order, List<OrderItem> orderItems) {
+		for (OrderItem orderItem : orderItems) {
+			Long productId = orderItem.getProduct().getProductId();
+			int quantity = orderItem.getQuantity();
+
+			StockEntity stock = stockRepository.findByProductIdWithPessimisticLock(productId)
+					.orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
+
+			stock.confirm(quantity);
+			stockHistoryRepository.save(
+					StockHistoryEntity.confirm(stock, order.getId(), quantity, "PAYMENT_CONFIRM")
+			);
+		}
 	}
 }
