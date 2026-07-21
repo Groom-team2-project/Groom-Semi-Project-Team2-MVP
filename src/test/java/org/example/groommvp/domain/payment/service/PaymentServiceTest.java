@@ -19,6 +19,7 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
+import org.example.groommvp.domain.stock.entity.StockHistoryType;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -71,9 +73,21 @@ public class PaymentServiceTest {
 		// then
 		assertThat(response.status()).isEqualTo(PaymentStatus.PAID);
 		assertThat(response.paidAt()).isNotNull();
+
 		verify(tossPaymentClient).confirm("test_pk_123", "1", 20000L);  // 서버 금액으로 승인 요청했는지
-		verify(stockHistoryRepository).save(any(StockHistoryEntity.class));
 		verify(paymentRepository).saveAndFlush(any(Payment.class));
+
+		ArgumentCaptor<StockHistoryEntity> historyCaptor = ArgumentCaptor.forClass(StockHistoryEntity.class);
+
+		assertThat(stock.getStocks()).isZero();
+		assertThat(stock.getReservedStocks()).isZero();
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+
+		verify(stockHistoryRepository).save(historyCaptor.capture());
+		StockHistoryEntity history = historyCaptor.getValue();
+		assertThat(history.getChangeType()).isEqualTo(StockHistoryType.CONFIRM);
+		assertThat(history.getOrderId()).isEqualTo(orderId);
+		assertThat(history.getChangedQty()).isEqualTo(1);
 	}
 
 	@Test

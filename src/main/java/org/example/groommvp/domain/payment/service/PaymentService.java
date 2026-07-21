@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.payment.service;
 
 import java.util.List;
+import java.util.Comparator;
 
 import org.example.groommvp.domain.order.entity.Order;
 import org.example.groommvp.domain.order.entity.OrderItem;
@@ -69,7 +70,11 @@ public class PaymentService {
 	}
 
 	private void confirmReservedStocks(Order order, List<OrderItem> orderItems) {
-		for (OrderItem orderItem : orderItems) {
+		List<OrderItem> sortedOrderItems = orderItems.stream()
+				.sorted(Comparator.comparing(orderItem -> orderItem.getProduct().getProductId()))
+				.toList();
+
+		for (OrderItem orderItem : sortedOrderItems) {
 			Long productId = orderItem.getProduct().getProductId();
 			int quantity = orderItem.getQuantity();
 
