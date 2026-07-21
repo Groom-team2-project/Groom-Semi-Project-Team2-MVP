@@ -29,7 +29,7 @@ public class ReviewEntity extends BaseEntity {
     @Column(name = "content", length = 100)
     private String content;
 
-    @Column(name = "rating")
+    @Column(name = "rating", nullable = false)
     private Integer rating;
 
     @Column(name = "deleted_at")

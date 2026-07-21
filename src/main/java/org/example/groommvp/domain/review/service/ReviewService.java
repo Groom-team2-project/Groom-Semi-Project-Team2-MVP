@@ -43,14 +43,14 @@ public class ReviewService {
     }
 
     public List<ReviewResponse> getByProductId(Long productId) {
-        return reviewRepository.findByProductId(productId)
+        return reviewRepository.findByProductIdAndDeletedAtIsNull(productId)
                 .stream()
                 .map(ReviewResponse::from)
                 .collect(Collectors.toList());
     }
 
     public ReviewResponse getByReviewId(Long reviewId) {
-        ReviewEntity entity = reviewRepository.findById(reviewId)
+        ReviewEntity entity = reviewRepository.findByReviewIdAndDeletedAtIsNull(reviewId)
                 .orElseThrow(() ->  new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         return ReviewResponse.from(entity);
@@ -58,7 +58,7 @@ public class ReviewService {
 
     @Transactional
     public ReviewResponse updateReview(Long reviewId, Long loginMemberId, ReviewUpdateRequest request) {
-        ReviewEntity entity = reviewRepository.findById(reviewId)
+        ReviewEntity entity = reviewRepository.findByReviewIdAndDeletedAtIsNull(reviewId)
                 .orElseThrow(() ->  new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         validateReviewOwner(entity, loginMemberId);
@@ -70,7 +70,7 @@ public class ReviewService {
 
     @Transactional
     public void deleteReview(Long reviewId, Long loginMemberId) {
-        ReviewEntity entity = reviewRepository.findById(reviewId)
+        ReviewEntity entity = reviewRepository.findByReviewIdAndDeletedAtIsNull(reviewId)
                 .orElseThrow(() ->  new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
         validateReviewOwner(entity, loginMemberId);
