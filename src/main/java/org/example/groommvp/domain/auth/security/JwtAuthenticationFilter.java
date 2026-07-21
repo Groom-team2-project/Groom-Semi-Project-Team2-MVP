@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.auth.dto.JwtClaims;
 import org.example.groommvp.domain.auth.service.JwtTokenProvider;
+import org.example.groommvp.global.config.SecurityErrorResponseWriter;
+import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -55,7 +57,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            SecurityErrorResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
         }
     }
 }
