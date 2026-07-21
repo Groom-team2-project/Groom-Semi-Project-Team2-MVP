@@ -24,7 +24,7 @@ public class OpenApiConfig {
                         .description("""
                                 ## 상품 관리 및 주문 처리 API
 
-                                상품 등록/조회/수정/삭제, 재고 관리, 주문, 주문 취소 기능을 제공합니다.
+                                상품 등록/조회/수정/삭제, 재고 관리, 주문 생성, 결제, 주문 취소 기능을 제공합니다.
 
                                 ### 공통 응답 형식
                                 **대부분의 조회·생성 성공 응답**은 `CommonResponse<T>` 로 감싸져 반환됩니다.
@@ -51,12 +51,17 @@ public class OpenApiConfig {
                                 | `INBOUND` | 입고로 인한 재고 증가 |
                                 | `DECREASE` | 구매로 인한 재고 차감 |
                                 | `RESTORE` | 주문 취소로 인한 재고 복구 |
+                                | `RESERVE` | 결제 전 재고 임시 예약 |
+                                | `CONFIRM` | 결제 성공 후 예약 재고 확정 차감 |
+                                | `RELEASE` | 결제 실패/만료 후 예약 재고 해제 |
 
                                 ### 주문 상태 (OrderStatus)
                                 | 상태 | 설명 |
                                 |---|---|
-                                | `COMPLETED` | 구매 완료 |
+                                | `PENDING_PAYMENT` | 결제 대기 |
+                                | `COMPLETED` | 결제 완료 |
                                 | `CANCELED` | 취소됨 |
+                                | `PAYMENT_FAILED` | 결제 실패 |
                                 """)
                         .version("v1.0.0")
                         .contact(new Contact()
