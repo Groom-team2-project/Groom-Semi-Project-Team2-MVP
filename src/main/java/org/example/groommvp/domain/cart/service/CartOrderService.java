@@ -85,7 +85,7 @@ public class CartOrderService {
                     line.product.getProductId(),
                     line.quantity,
                     line.orderPrice,
-                    line.stock.getStocks()));
+                    line.stock.getAvailableStocks()));
         }
 
         // 3) 주문 전환 완료 → 장바구니 비우기
