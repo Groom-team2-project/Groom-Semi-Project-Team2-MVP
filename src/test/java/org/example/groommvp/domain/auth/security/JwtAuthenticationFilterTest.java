@@ -1,12 +1,15 @@
 package org.example.groommvp.domain.auth.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
 import org.example.groommvp.domain.auth.dto.JwtClaims;
 import org.example.groommvp.domain.auth.service.JwtTokenProvider;
 import org.example.groommvp.domain.member.entity.AuthProvider;
@@ -116,6 +119,36 @@ class JwtAuthenticationFilterTest {
         jwtAuthenticationFilter.doFilter(request, response, filterChain);
 
         assertThat(response.getStatus()).isEqualTo(MockHttpServletResponse.SC_UNAUTHORIZED);
+        assertThat(response.getContentType()).contains("application/json");
+        assertThat(response.getContentAsString()).contains("\"success\":false");
+        assertThat(response.getContentAsString()).contains("\"errorCode\":\"INVALID_TOKEN\"");
+        assertThat(response.getContentAsString()).contains("\"message\":\"유효하지 않은 토큰입니다.\"");
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void doFilterDoesNotConvertDownstreamExceptionWhenBearerTokenIsValid() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain filterChain = (servletRequest, servletResponse) -> {
+            throw new ServletException("Downstream exception.");
+        };
+        JwtClaims claims = new JwtClaims(
+                1L,
+                MemberRole.USER,
+                AuthProvider.KAKAO,
+                Instant.now(),
+                Instant.now().plusSeconds(7200)
+        );
+        when(jwtTokenProvider.getValidClaims(VALID_TOKEN)).thenReturn(claims);
+
+        assertThatThrownBy(() -> jwtAuthenticationFilter.doFilter(request, response, filterChain))
+                .isInstanceOf(ServletException.class)
+                .hasMessage("Downstream exception.");
+
+        assertThat(response.getStatus()).isEqualTo(MockHttpServletResponse.SC_OK);
+        assertThat(response.getContentAsString()).isBlank();
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
     }
 }
