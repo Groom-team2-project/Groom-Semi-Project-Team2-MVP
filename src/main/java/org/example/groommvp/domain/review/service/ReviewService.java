@@ -8,6 +8,7 @@ import org.example.groommvp.domain.review.entity.ReviewEntity;
 import org.example.groommvp.domain.review.repository.ReviewRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +39,11 @@ public class ReviewService {
                 .rating(reviewRequest.getRating())
                 .build();
 
-        return ReviewResponse.from(reviewRepository.save(entity));
+        try {
+            return ReviewResponse.from(reviewRepository.saveAndFlush(entity));
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
+        }
     }
 
     public List<ReviewResponse> getByProductId(Long productId) {
