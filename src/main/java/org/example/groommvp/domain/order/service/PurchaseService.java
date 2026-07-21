@@ -41,19 +41,19 @@ public class PurchaseService {
         ProductEntity product = stock.getProduct();
         int quantity = request.quantity();
 
-        stock.decrease(quantity);
+        stock.reserve(quantity);
 
         int orderPrice = product.getProductPrice();
         long totalPrice = (long) orderPrice * quantity;
-        Order order = orderRepository.save(new Order(totalPrice));
+        Order order = orderRepository.save(Order.pendingPayment(totalPrice));
         orderItemRepository.save(new OrderItem(order, product, quantity, orderPrice));
-        stockHistoryRepository.save(StockHistoryEntity.decrease(stock, order.getId(), quantity, PURCHASE_REASON));
+        stockHistoryRepository.save(StockHistoryEntity.reserve(stock, order.getId(), quantity, PURCHASE_REASON));
 
         return new PurchaseResponse(
                 order.getId(),
                 product.getProductId(),
                 quantity,
-                stock.getStocks(),
+                stock.getAvailableStocks(),
                 order.getCreatedAt()
         );
     }

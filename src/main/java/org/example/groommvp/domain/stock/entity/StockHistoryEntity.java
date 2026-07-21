@@ -117,6 +117,24 @@ public class StockHistoryEntity {
     }
 
     /**
+     * 구매 요청 시 예약 이력 생성. (RESERVE, 결제 전 재고 임시 점유)
+     *
+     * @param stock    예약된 재고
+     * @param orderId  예약을 유발한 주문 ID
+     * @param quantity 예약 수량 (양수 magnitude)
+     * @param reason   변경 사유 (nullable)
+     */
+    public static StockHistoryEntity reserve(StockEntity stock, Long orderId, int quantity, String reason) {
+        return StockHistoryEntity.builder()
+                .stock(stock)
+                .orderId(orderId)
+                .changeType(StockHistoryType.RESERVE)
+                .reason(reason)
+                .changedQty(quantity)
+                .build();
+    }
+
+    /**
      * 취소 복구 이력 생성. (RESTORE, 주문 취소에 의한 변동)
      *
      * @param stock    복구된 재고
@@ -131,6 +149,42 @@ public class StockHistoryEntity {
                 .changeType(StockHistoryType.RESTORE)
                 .reason(reason)
                 .changedQty(quantity)
+                .build();
+    }
+
+    /**
+     * 결제 성공 확정 이력 생성. (CONFIRM, 예약 재고의 실제 차감 확정)
+     *
+     * @param stock    확정 처리된 재고
+     * @param orderId  결제가 성공한 주문 ID
+     * @param quantity 확정 수량 (양수 magnitude)
+     * @param reason   변경 사유 (nullable)
+     */
+    public static StockHistoryEntity confirm(StockEntity stock, Long orderId, int quantity, String reason) {
+        return StockHistoryEntity.builder()
+                .stock(stock)
+                .orderId(orderId)
+                .changeType(StockHistoryType.CONFIRM)
+                .changedQty(quantity)
+                .reason(reason)
+                .build();
+    }
+
+    /**
+     * 결제 실패/취소 해제 이력 생성. (RELEASE, 예약 재고의 판매 가능 상태 복구)
+     *
+     * @param stock    예약 해제된 재고
+     * @param orderId  결제 실패 또는 취소된 주문 ID
+     * @param quantity 해제 수량 (양수 magnitude)
+     * @param reason   변경 사유 (nullable)
+     */
+    public static StockHistoryEntity release(StockEntity stock, Long orderId, int quantity, String reason) {
+        return StockHistoryEntity.builder()
+                .stock(stock)
+                .orderId(orderId)
+                .changeType(StockHistoryType.RELEASE)
+                .changedQty(quantity)
+                .reason(reason)
                 .build();
     }
 }
