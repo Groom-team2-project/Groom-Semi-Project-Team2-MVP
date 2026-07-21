@@ -72,13 +72,21 @@ class MemberControllerTest {
     @Test
     void getMeReturnsUnauthorizedWithoutToken() throws Exception {
         mockMvc.perform(get("/api/v1/members/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("인증이 필요합니다."));
     }
 
     @Test
     void getMeReturnsUnauthorizedWithInvalidToken() throws Exception {
         mockMvc.perform(get("/api/v1/members/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data").doesNotExist())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_TOKEN"))
+                .andExpect(jsonPath("$.message").value("유효하지 않은 토큰입니다."));
     }
 }

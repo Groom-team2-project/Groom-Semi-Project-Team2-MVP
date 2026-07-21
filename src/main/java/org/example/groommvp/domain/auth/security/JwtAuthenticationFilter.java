@@ -7,6 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.auth.dto.JwtClaims;
 import org.example.groommvp.domain.auth.service.JwtTokenProvider;
+import org.example.groommvp.global.config.SecurityErrorResponseWriter;
+import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -35,27 +37,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authorization.substring(BEARER_PREFIX.length());
 
+        JwtClaims claims;
         try {
-            JwtClaims claims = jwtTokenProvider.getValidClaims(token);
-
-            AuthMember authMember = new AuthMember(
-                    claims.memberId(),
-                    claims.role(),
-                    claims.provider()
-            );
-
-            Authentication authentication = new UsernamePasswordAuthenticationToken(
-                    authMember,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name()))
-            );
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-            filterChain.doFilter(request, response);
+            claims = jwtTokenProvider.getValidClaims(token);
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            SecurityErrorResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
+            return;
         }
+
+        AuthMember authMember = new AuthMember(
+                claims.memberId(),
+                claims.role(),
+                claims.provider()
+        );
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                authMember,
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + claims.role().name()))
+        );
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        filterChain.doFilter(request, response);
     }
 }
