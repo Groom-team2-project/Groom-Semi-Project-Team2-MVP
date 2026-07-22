@@ -19,7 +19,7 @@ class JwtTokenProviderTest {
     @BeforeEach
     void setUp() {
         jwtTokenProvider = new JwtTokenProvider(
-                new JwtProperties("test-jwt-secret-key", 7200)
+                new JwtProperties("test-jwt-secret-key", 7200L, 1209600L)
         );
     }
 
