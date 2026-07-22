@@ -3,11 +3,14 @@ package org.example.groommvp.domain.category.entity;
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 
 @Entity
 @Getter
 @Table(name = "categories")
+@NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class CategoryEntity {
 
     @Id
@@ -25,9 +28,15 @@ public class CategoryEntity {
     @Builder
     public CategoryEntity(
             String categoryName,
-            CategoryEntity parentId
+            CategoryEntity parentCategory
     ) {
         this.categoryName = categoryName;
         this.parentCategory = parentCategory;
+    }
+
+    public void update(
+            String categoryName
+    ) {
+        this.categoryName = categoryName;
     }
 }
