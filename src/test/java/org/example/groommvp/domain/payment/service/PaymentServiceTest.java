@@ -29,6 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.ArgumentCaptor;
+import org.springframework.web.client.RestClientException;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -106,6 +107,30 @@ public class PaymentServiceTest {
 
 		// 사전 체크에서 막혀 토스 승인은 호출되지 않아야 한다
 		verify(tossPaymentClient, never()).confirm(any(), any(), anyLong());
+	}
+
+	@Test
+	@DisplayName("토스 승인이 실패하면 PAYMENT_FAILED 예외가 발생하고 주문/재고는 그대로다")
+	void pay_failed() {
+		// given
+		Long orderId = 1L;
+		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
+		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+		given(paymentRepository.existsByOrder(order)).willReturn(false);
+
+		// 토스 승인 실패 시뮬레이션 (confirm이 예외를 던지도록)
+		doThrow(new RestClientException("toss error"))
+			.when(tossPaymentClient).confirm(anyString(), anyString(), anyLong());
+
+		// when & then
+		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "CARD")))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_FAILED);
+
+		// 실패 시 저장·재고확정·상태변경이 일어나지 않아야 한다 (롤백 → 재시도 가능)
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+		verify(paymentRepository, never()).saveAndFlush(any());
+		verify(stockHistoryRepository, never()).save(any());
 	}
 
 	private Order order(Long id, Long totalPrice, OrderStatus status) {

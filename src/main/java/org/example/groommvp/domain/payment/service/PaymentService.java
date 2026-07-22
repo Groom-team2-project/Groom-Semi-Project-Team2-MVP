@@ -21,6 +21,7 @@ import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -48,7 +49,11 @@ public class PaymentService {
 		}
 
 		// 토스 결제 승인
-		tossPaymentClient.confirm(request.paymentKey(), String.valueOf(orderId), order.getTotalPrice());
+		try {
+			tossPaymentClient.confirm(request.paymentKey(), String.valueOf(orderId), order.getTotalPrice());
+		} catch (RestClientException e) {
+			throw new BusinessException(ErrorCode.PAYMENT_FAILED);
+		}
 
 		List<OrderItem> orderItems = orderItemRepository.findByOrderIdWithProduct(orderId);
 		confirmReservedStocks(order, orderItems);
@@ -84,6 +89,26 @@ public class PaymentService {
 			stock.confirm(quantity);
 			stockHistoryRepository.save(
 					StockHistoryEntity.confirm(stock, order.getId(), quantity, "PAYMENT_CONFIRM")
+			);
+		}
+	}
+
+
+	private void releaseReservedStocks(Order order, List<OrderItem> orderItems) {
+		List<OrderItem> sortedOrderItems = orderItems.stream()
+			.sorted(Comparator.comparing(orderItem -> orderItem.getProduct().getProductId()))
+			.toList();
+
+		for (OrderItem orderItem : sortedOrderItems) {
+			Long productId = orderItem.getProduct().getProductId();
+			int quantity = orderItem.getQuantity();
+
+			StockEntity stock = stockRepository.findByProductIdWithPessimisticLock(productId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
+
+			stock.release(quantity);
+			stockHistoryRepository.save(
+				StockHistoryEntity.release(stock, order.getId(), quantity, "PAYMENT_RELEASE")
 			);
 		}
 	}
