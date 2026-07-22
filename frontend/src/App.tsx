@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiRequest, ApiResult, toPrettyJson, unwrapData } from './api';
 
 type LogEntry = {
-  id: number;
+  id: string;
   label: string;
   method: string;
   path: string;
@@ -66,6 +66,12 @@ function formatPrice(price?: number) {
 
 function productInitial(product?: Product | null) {
   return product?.productName?.slice(0, 2).toUpperCase() ?? 'SO';
+}
+
+function createLogId() {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function readProductCache(): Product[] {
@@ -193,6 +199,7 @@ export default function App() {
     tokenOverride?: string
   ): Promise<ApiResult<T>> {
     setIsLoading(true);
+    const startedAt = performance.now();
     try {
       const result = await apiRequest<T>(path, {
         method,
@@ -202,7 +209,7 @@ export default function App() {
 
       setLogs((prev) => [
         {
-          id: Date.now(),
+          id: createLogId(),
           label,
           method,
           path,
@@ -214,6 +221,37 @@ export default function App() {
         },
         ...prev
       ].slice(0, 14));
+
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.';
+      const result: ApiResult<T> = {
+        ok: false,
+        status: 0,
+        body: {
+          success: false,
+          data: null,
+          errorCode: 'NETWORK_ERROR',
+          message
+        },
+        elapsedMs: Math.round(performance.now() - startedAt)
+      };
+
+      setLogs((prev) => [
+        {
+          id: createLogId(),
+          label,
+          method,
+          path,
+          status: result.status,
+          ok: result.ok,
+          elapsedMs: result.elapsedMs,
+          body: result.body,
+          requestedAt: new Date().toLocaleTimeString()
+        },
+        ...prev
+      ].slice(0, 14));
+      setNotice(`요청에 실패했습니다: ${message}`);
 
       return result;
     } finally {
@@ -409,7 +447,32 @@ export default function App() {
   async function runCustomApi() {
     let body: unknown = undefined;
     if (!['GET', 'DELETE'].includes(customMethod) && customBody.trim()) {
-      body = JSON.parse(customBody);
+      try {
+        body = JSON.parse(customBody);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'JSON 형식이 올바르지 않습니다.';
+        setLogs((prev) => [
+          {
+            id: createLogId(),
+            label: '직접 API 호출',
+            method: customMethod,
+            path: customPath,
+            status: 0,
+            ok: false,
+            elapsedMs: 0,
+            body: {
+              success: false,
+              data: null,
+              errorCode: 'INVALID_JSON',
+              message
+            },
+            requestedAt: new Date().toLocaleTimeString()
+          },
+          ...prev
+        ].slice(0, 14));
+        setNotice(`요청 본문 JSON을 확인해주세요: ${message}`);
+        return;
+      }
     }
     await run('직접 API 호출', customMethod, customPath, body, true);
   }
