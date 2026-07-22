@@ -26,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -52,8 +54,10 @@ public class PaymentService {
 
 		// 토스 결제 승인
 		try {
-			tossPaymentClient.confirm(request.paymentKey(), String.valueOf(orderId), order.getTotalPrice());
+			tossPaymentClient.confirm(request.paymentKey(), "ORDER_" + orderId, order.getTotalPrice());
 		} catch (RestClientException e) {
+			// 토스가 돌려준 실패 원인(상태코드 + 응답 본문)을 로그로 남긴다
+			log.error("토스 결제 승인 실패: {}", e.getMessage(), e);
 			throw new BusinessException(ErrorCode.PAYMENT_FAILED);
 		}
 

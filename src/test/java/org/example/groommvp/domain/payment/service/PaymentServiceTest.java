@@ -77,7 +77,7 @@ public class PaymentServiceTest {
 		assertThat(response.status()).isEqualTo(PaymentStatus.PAID);
 		assertThat(response.paidAt()).isNotNull();
 
-		verify(tossPaymentClient).confirm("test_pk_123", "1", 20000L);  // 서버 금액으로 승인 요청했는지
+		verify(tossPaymentClient).confirm("test_pk_123", "ORDER_1", 20000L);  // 서버 금액으로 승인 요청했는지
 		verify(paymentRepository).saveAndFlush(any(Payment.class));
 
 		ArgumentCaptor<StockHistoryEntity> historyCaptor = ArgumentCaptor.forClass(StockHistoryEntity.class);
