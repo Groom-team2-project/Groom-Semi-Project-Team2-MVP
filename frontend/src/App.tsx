@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { apiRequest, ApiResult, toPrettyJson, unwrapData } from './api';
+import { requestTossPayment, TossMethod, PAYMENT_METHOD_KEY } from './payment';
 
 type LogEntry = {
   id: string;
@@ -129,6 +130,8 @@ export default function App() {
   const isAdmin = routePath.startsWith('/admin');
   const isCheckout = routePath.startsWith('/checkout/');
   const isOrderPage = routePath.startsWith('/orders/');
+  const isPaymentSuccess = routePath === '/payment/success';
+  const isPaymentFail = routePath === '/payment/fail';
   const checkoutProductId = isCheckout ? routePath.split('/')[2] : '';
   const routeOrderId = isOrderPage ? routePath.split('/')[2] : '';
   const visibleProducts = products;
@@ -155,6 +158,11 @@ export default function App() {
       setState(callbackState);
       localStorage.setItem(STATE_KEY, callbackState);
       completeKakaoLogin(callbackCode, callbackState, FRONT_CALLBACK_URI);
+    }
+
+    // 토스 결제 성공 리다이렉트 → 백엔드에 결제 승인 요청
+    if (window.location.pathname === '/payment/success') {
+      void confirmTossPayment();
     }
 
     void getProducts(undefined, { quiet: true });
@@ -444,6 +452,65 @@ export default function App() {
     }
   }
 
+  // 주문 상세에서 "결제하기" → 토스 결제창 호출
+  async function startPayment() {
+    const pk = orderDetail?.orderId ?? Number(routeOrderId);
+    const amount = orderDetail?.totalPrice ?? 0;
+    if (!pk || amount <= 0) {
+      setNotice('결제할 주문 정보가 없습니다.');
+      return;
+    }
+    try {
+      await requestTossPayment({
+        orderPk: pk,
+        amount,
+        orderName: `SoldOut 주문 #${pk}`,
+        method: paymentMethod as TossMethod
+      });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '결제 요청에 실패했습니다.');
+    }
+  }
+
+  // 토스 결제 성공 후 successUrl 진입 시 백엔드 승인(confirm) 호출
+  async function confirmTossPayment() {
+    const params = new URLSearchParams(window.location.search);
+    const paymentKey = params.get('paymentKey');
+    const tossOrderId = params.get('orderId') ?? '';
+    const orderPk = tossOrderId.replace('ORDER_', '');
+    const method = sessionStorage.getItem(PAYMENT_METHOD_KEY) ?? 'CARD';
+
+    if (!paymentKey || !orderPk) {
+      setNotice('결제 정보가 올바르지 않습니다.');
+      return;
+    }
+
+    const result = await run('결제 승인', 'POST', `/api/v1/orders/${orderPk}/payments`, {
+      paymentKey,
+      method
+    });
+
+    if (result.ok) {
+      setNotice('결제가 완료되었습니다!');
+      setOrderId(orderPk);
+      navigate(`/orders/${orderPk}`);
+    } else {
+      setNotice('결제 승인에 실패했습니다. 응답 로그를 확인해주세요.');
+    }
+  }
+
+  // 주문 상세에서 "환불하기" → 백엔드 환불 호출
+  async function refundPayment() {
+    const pk = orderDetail?.orderId ?? routeOrderId;
+    const result = await run('결제 환불', 'POST', `/api/v1/orders/${pk}/payments/refund`, {
+      cancelReason: '고객 환불 요청'
+    });
+    if (result.ok) {
+      setNotice('환불이 완료되었습니다.');
+      void loadOrder(String(pk));
+    }
+  }
+
   async function runCustomApi() {
     let body: unknown = undefined;
     if (!['GET', 'DELETE'].includes(customMethod) && customBody.trim()) {
@@ -717,6 +784,40 @@ export default function App() {
     );
   }
 
+  if (isPaymentSuccess) {
+    return (
+      <main className="store-shell">
+        <section className="order-page">
+          <div className="order-hero">
+            <div>
+              <p className="eyebrow">Payment</p>
+              <h1>결제 처리 중…</h1>
+              <p>토스 결제 승인을 확인하고 있습니다. 잠시만 기다려 주세요.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (isPaymentFail) {
+    const failParams = new URLSearchParams(window.location.search);
+    return (
+      <main className="store-shell">
+        <section className="order-page">
+          <button type="button" className="back-link" onClick={() => navigate('/')}>상품 목록으로 돌아가기</button>
+          <div className="order-hero">
+            <div>
+              <p className="eyebrow">Payment</p>
+              <h1>결제에 실패했습니다</h1>
+              <p>{failParams.get('message') ?? '결제가 취소되었거나 실패했습니다.'}</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   if (isOrderPage) {
     const items = orderDetail?.orderItems ?? [];
 
@@ -796,7 +897,23 @@ export default function App() {
                 <span>총 주문 금액</span>
                 <strong>{formatPrice(orderDetail?.totalPrice)}</strong>
               </div>
-              <button type="button" className="primary" onClick={() => navigate('/')}>계속 쇼핑하기</button>
+
+              {orderDetail?.status === 'PENDING_PAYMENT' ? (
+                <>
+                  <div className="payment-methods" role="group" aria-label="결제 수단">
+                    <button type="button" className={paymentMethod === 'CARD' ? 'selected' : ''} onClick={() => setPaymentMethod('CARD')}>카드</button>
+                    <button type="button" className={paymentMethod === 'TRANSFER' ? 'selected' : ''} onClick={() => setPaymentMethod('TRANSFER')}>계좌이체</button>
+                    <button type="button" className={paymentMethod === 'EASY_PAY' ? 'selected' : ''} onClick={() => setPaymentMethod('EASY_PAY')}>간편결제</button>
+                  </div>
+                  <button type="button" className="primary" onClick={startPayment} disabled={isLoading}>결제하기</button>
+                </>
+              ) : null}
+
+              {orderDetail?.status === 'COMPLETED' ? (
+                <button type="button" className="primary" onClick={refundPayment} disabled={isLoading}>환불하기</button>
+              ) : null}
+
+              <button type="button" onClick={() => navigate('/')}>계속 쇼핑하기</button>
             </aside>
           </div>
         </section>
