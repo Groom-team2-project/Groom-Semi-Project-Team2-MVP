@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 public class FirstComeEventController {
     private final FirstComeEventService firstComeEventService;
 
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/{eventId}/participate")
     public ResponseEntity<CommonResponse<FirstComeEventParticipateResponse>> participate(
             @PathVariable Long eventId,
