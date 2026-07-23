@@ -22,13 +22,14 @@ import java.util.List;
 @Tag(name = "Review", description = "상품 리뷰 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/")
+@RequestMapping("/api/v1")
 public class ReviewController {
     private final ReviewService reviewService;
 
     @Operation(
             summary = "리뷰 등록",
-            description = "상품 리뷰를 등록합니다."
+            description = "상품 리뷰를 등록합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     @PostMapping("/reviews")
     public ResponseEntity<CommonResponse<ReviewResponse>> createReview(
@@ -44,8 +45,7 @@ public class ReviewController {
 
     @Operation(
             summary = "상품별 리뷰 목록 조회",
-            description = "특정 상품에 등록된 리뷰 목록을 조회합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
+            description = "특정 상품에 등록된 리뷰 목록을 조회합니다."
     )
     @GetMapping("/products/{productId}/reviews")
     public ResponseEntity<CommonResponse<List<ReviewResponse>>> getReviewsByProduct(
