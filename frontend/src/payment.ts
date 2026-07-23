@@ -6,7 +6,7 @@ const CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string | undefined;
 // 결제 승인(confirm) 시 다시 필요한 결제 수단을 successUrl 이동 후에도 읽기 위해 저장하는 키
 export const PAYMENT_METHOD_KEY = 'toss_payment_method';
 
-export type TossMethod = 'CARD' | 'TRANSFER' | 'EASY_PAY';
+export type TossMethod = 'CARD' | 'TRANSFER';
 
 /**
  * 토스 결제창을 띄운다. 성공 시 토스가 successUrl 로 리다이렉트하며
