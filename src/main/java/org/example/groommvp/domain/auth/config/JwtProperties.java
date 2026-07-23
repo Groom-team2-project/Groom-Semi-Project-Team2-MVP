@@ -5,7 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.jwt")
 public record JwtProperties(
         String secret,
-        long accessTokenExpirationSeconds
+        long accessTokenExpirationSeconds,
+        long refreshTokenExpirationSeconds
 ) {
     public JwtProperties {
         if (secret == null || secret.isBlank()) {
@@ -13,6 +14,9 @@ public record JwtProperties(
         }
         if (accessTokenExpirationSeconds <= 0) {
             accessTokenExpirationSeconds = 7200;
+        }
+        if (refreshTokenExpirationSeconds <= 0) {
+            refreshTokenExpirationSeconds = 1_209_600;
         }
     }
 }

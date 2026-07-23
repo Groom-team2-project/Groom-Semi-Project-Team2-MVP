@@ -47,6 +47,17 @@ public enum ErrorCode {
 
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
     IMAGE_ALREADY_EXISTS(HttpStatus.CONFLICT, "상품 이미지는 하나만 등록할 수 있습니다."),
+    
+    CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
+    CATEGORY_NAME_DUPLICATED(HttpStatus.CONFLICT, "중복된 카테고리명입니다."),
+    PARENT_CATEGORY_MISSING(HttpStatus.CONFLICT, "중분류 카테고리를 입력하세요."),
+    INVALID_PARENT_CATEGORY(HttpStatus.CONFLICT, "대분류에만 추가할 수 있습니다."),
+    CATEGORY_HAS_CHILDREN(HttpStatus.CONFLICT, "하위 카테고리가 있어 카테고리를 삭제할 수 없습니다."),
+    CATEGORY_HAS_PRODUCTS(HttpStatus.CONFLICT, "연결된 상품이 있어 카테고리를 삭제할 수 없습니다."),
+
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
+    REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "동일 회원은 동일 상품에 리뷰를 하나만 등록할 수 있습니다."),
+    REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원이 작성한 리뷰에 접근할 수 없습니다."),
 
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제를 찾을 수 없습니다."),
     PAYMENT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 결제된 주문입니다."),
