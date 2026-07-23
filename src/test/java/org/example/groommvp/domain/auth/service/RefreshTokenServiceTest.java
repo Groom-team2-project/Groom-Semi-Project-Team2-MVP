@@ -2,7 +2,6 @@ package org.example.groommvp.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -38,12 +37,12 @@ class RefreshTokenServiceTest {
     void issueStoresRefreshTokenWithMemberIdAndTtl() {
         @SuppressWarnings("unchecked")
         RBucket<String> bucket = mock(RBucket.class);
-        when(redissonClient.<String>getBucket(anyString())).thenReturn(bucket);
+        when(redissonClient.<String>getBucket(anyString(), eq(StringCodec.INSTANCE))).thenReturn(bucket);
 
         String refreshToken = refreshTokenService.issue(1L);
 
         assertThat(refreshToken).isNotBlank();
-        verify(redissonClient).getBucket(anyString());
+        verify(redissonClient).getBucket(anyString(), eq(StringCodec.INSTANCE));
         verify(bucket).set("1", Duration.ofSeconds(1209600L));
     }
 
@@ -51,7 +50,7 @@ class RefreshTokenServiceTest {
     void validateAndGetMemberIdReturnsStoredMemberId() {
         @SuppressWarnings("unchecked")
         RBucket<String> bucket = mock(RBucket.class);
-        when(redissonClient.<String>getBucket(anyString())).thenReturn(bucket);
+        when(redissonClient.<String>getBucket(anyString(), eq(StringCodec.INSTANCE))).thenReturn(bucket);
         when(bucket.get()).thenReturn("1");
 
         Long memberId = refreshTokenService.validateAndGetMemberId("refresh-token");
@@ -64,14 +63,14 @@ class RefreshTokenServiceTest {
         assertThatThrownBy(() -> refreshTokenService.validateAndGetMemberId(" "))
                 .isInstanceOf(BusinessException.class);
 
-        verify(redissonClient, never()).getBucket(anyString());
+        verify(redissonClient, never()).getBucket(anyString(), eq(StringCodec.INSTANCE));
     }
 
     @Test
     void validateAndGetMemberIdThrowsWhenTokenIsExpiredOrRevoked() {
         @SuppressWarnings("unchecked")
         RBucket<String> bucket = mock(RBucket.class);
-        when(redissonClient.<String>getBucket(anyString())).thenReturn(bucket);
+        when(redissonClient.<String>getBucket(anyString(), eq(StringCodec.INSTANCE))).thenReturn(bucket);
         when(bucket.get()).thenReturn(null);
 
         assertThatThrownBy(() -> refreshTokenService.validateAndGetMemberId("refresh-token"))
@@ -126,7 +125,7 @@ class RefreshTokenServiceTest {
     void revokeDeletesRefreshToken() {
         @SuppressWarnings("unchecked")
         RBucket<String> bucket = mock(RBucket.class);
-        when(redissonClient.<String>getBucket(anyString())).thenReturn(bucket);
+        when(redissonClient.<String>getBucket(anyString(), eq(StringCodec.INSTANCE))).thenReturn(bucket);
 
         refreshTokenService.revoke("refresh-token");
 
@@ -137,6 +136,6 @@ class RefreshTokenServiceTest {
     void revokeIgnoresBlankToken() {
         refreshTokenService.revoke(" ");
 
-        verify(redissonClient, never()).getBucket(anyString());
+        verify(redissonClient, never()).getBucket(anyString(), eq(StringCodec.INSTANCE));
     }
 }
