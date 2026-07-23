@@ -17,6 +17,8 @@ public interface CategoryRepository extends JpaRepository<CategoryEntity, Long> 
 
     List<CategoryEntity> findAllByParentCategoryOrderByCategoryIdAsc(CategoryEntity parentCategory);
 
+    boolean isEmpty();
+
     //카테고리 삭제 전 연결 확인
     boolean existsByParentCategory(CategoryEntity parentCategory);
 }
