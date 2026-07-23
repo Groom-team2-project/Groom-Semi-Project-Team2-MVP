@@ -2,6 +2,8 @@ package org.example.groommvp.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ProductListResponse;
+import org.example.groommvp.domain.category.entity.CategoryEntity;
+import org.example.groommvp.domain.category.repository.CategoryRepository;
 import org.example.groommvp.domain.product.dto.ProductResponse;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.domain.stock.entity.StockEntity;
@@ -23,13 +25,24 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final StockRepository stockRepository;
+    private final CategoryRepository categoryRepository;
 
     //상품 등록
     @Transactional
     public Long createProduct(ProductCreateRequest request) {
+        CategoryEntity category = null;
+        if (request.getCategoryId() != null) {
+            category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+            if (category.getParentCategory() == null) {
+                throw new BusinessException(ErrorCode.INVALID_PARENT_CATEGORY);
+            }
+        }
+
         ProductEntity product = ProductEntity.builder()
                 .productName(request.getProductName())
                 .productPrice(request.getProductPrice())
+                .category(category)
                 .build();
         ProductEntity savedProduct =  productRepository.save(product);
 

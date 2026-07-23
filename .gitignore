@@ -98,3 +98,13 @@ spring-shell.log
 /target/
 .jacoco/
 *.exec
+
+# ========================
+# Frontend
+# ========================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+frontend/*.tsbuildinfo

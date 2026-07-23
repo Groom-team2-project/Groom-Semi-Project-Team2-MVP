@@ -3,6 +3,7 @@ package org.example.groommvp.domain.cart.service;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.cart.config.CartCacheNames;
 import org.example.groommvp.domain.cart.dto.CartCheckoutResponse;
 import org.example.groommvp.domain.cart.entity.CartEntity;
 import org.example.groommvp.domain.cart.entity.CartItemEntity;
@@ -18,6 +19,7 @@ import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +48,7 @@ public class CartOrderService {
     private final OrderItemRepository orderItemRepository;
 
     /** 장바구니 전체를 주문으로 전환하고 장바구니를 비운다. */
+    @CacheEvict(cacheNames = CartCacheNames.CART, key = "#memberId")
     @Transactional
     public CartCheckoutResponse checkout(Long memberId) {
         CartEntity cart = cartRepository.findByMemberIdWithItems(memberId)

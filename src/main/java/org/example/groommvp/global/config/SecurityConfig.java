@@ -30,7 +30,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 // 아래에 인증 필요 API 입력
-                                "/api/v1/members/me"
+                                "/api/v1/members/me",
+                                "/api/v1/members/me/**",
+                                "/api/v1/carts/**",
+                                "/api/v1/coupons/*/issue"
+                                "/api/v1/events/*/participate"
                                 /*
                                 "api/v1/orders/{orderId}",
                                 "api/v1/products/{productId}/orders"
