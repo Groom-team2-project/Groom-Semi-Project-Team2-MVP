@@ -41,7 +41,7 @@ public class RefreshTokenService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "Refresh Token이 필요합니다.");
         }
 
-        RBucket<String> bucket = redissonClient.getBucket(tokenKey(refreshToken));
+        RBucket<String> bucket = redissonClient.getBucket(tokenKey(refreshToken), StringCodec.INSTANCE);
         String memberId = bucket.get();
 
         if (!StringUtils.hasText(memberId)) {
@@ -91,7 +91,7 @@ public class RefreshTokenService {
             return;
         }
 
-        redissonClient.getBucket(tokenKey(refreshToken)).delete();
+        redissonClient.getBucket(tokenKey(refreshToken), StringCodec.INSTANCE).delete();
     }
 
     public long getRefreshTokenExpirationSeconds() {
