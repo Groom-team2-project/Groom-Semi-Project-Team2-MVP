@@ -30,7 +30,7 @@ public class RefreshTokenService {
     public String issue(Long memberId) {
         String refreshToken = generateSecureToken();
 
-        RBucket<String> bucket = redissonClient.getBucket(tokenKey(refreshToken));
+        RBucket<String> bucket = redissonClient.getBucket(tokenKey(refreshToken), StringCodec.INSTANCE);
         bucket.set(String.valueOf(memberId), Duration.ofSeconds(jwtProperties.refreshTokenExpirationSeconds()));
 
         return refreshToken;
