@@ -32,4 +32,7 @@ public class ProductCreateRequest {
     @NotNull(message = "등록할 제품의 수량을 입력하세요.")
     @Positive(message = "제품 수량은 0보다 커야 합니다.")
     private Integer stocks;
+
+    @Schema(description = "상품이 속할 중분류 카테고리 ID", example = "2")
+    private Long categoryId;
 }
