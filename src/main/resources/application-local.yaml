@@ -28,3 +28,4 @@ app:
 toss:
   secret-key: ${TOSS_SECRET_KEY}
   confirm-url: https://api.tosspayments.com/v1/payments/confirm
+  cancel-url: https://api.tosspayments.com/v1/payments/{paymentKey}/cancel
