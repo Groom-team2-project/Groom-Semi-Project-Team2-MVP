@@ -424,6 +424,7 @@ export default function App() {
     if (nextOrderId) {
       setOrderId(String(nextOrderId));
       setNotice(`주문이 생성되었습니다. 주문 번호는 ${nextOrderId}입니다.`);
+      await loadOrder(String(nextOrderId));
       navigate(`/orders/${nextOrderId}`);
     } else if (!result.ok) {
       setNotice('구매에 실패했습니다. 응답 로그를 확인해주세요.');
@@ -491,8 +492,9 @@ export default function App() {
     });
 
     if (result.ok) {
-      setNotice('결제가 완료되었습니다!');
       setOrderId(orderPk);
+      await loadOrder(orderPk);
+      setNotice('결제가 완료되었습니다!');
       navigate(`/orders/${orderPk}`);
     } else {
       setNotice('결제 승인에 실패했습니다. 응답 로그를 확인해주세요.');
@@ -744,13 +746,10 @@ export default function App() {
 
             <div className="payment-methods" role="group" aria-label="결제 수단">
               <button type="button" className={paymentMethod === 'CARD' ? 'selected' : ''} onClick={() => setPaymentMethod('CARD')}>
-                카드 결제
+                카드/간편결제
               </button>
               <button type="button" className={paymentMethod === 'TRANSFER' ? 'selected' : ''} onClick={() => setPaymentMethod('TRANSFER')}>
                 계좌 이체
-              </button>
-              <button type="button" className={paymentMethod === 'EASY_PAY' ? 'selected' : ''} onClick={() => setPaymentMethod('EASY_PAY')}>
-                간편 결제
               </button>
             </div>
 
@@ -901,9 +900,8 @@ export default function App() {
               {orderDetail?.status === 'PENDING_PAYMENT' ? (
                 <>
                   <div className="payment-methods" role="group" aria-label="결제 수단">
-                    <button type="button" className={paymentMethod === 'CARD' ? 'selected' : ''} onClick={() => setPaymentMethod('CARD')}>카드</button>
+                    <button type="button" className={paymentMethod === 'CARD' ? 'selected' : ''} onClick={() => setPaymentMethod('CARD')}>카드/간편결제</button>
                     <button type="button" className={paymentMethod === 'TRANSFER' ? 'selected' : ''} onClick={() => setPaymentMethod('TRANSFER')}>계좌이체</button>
-                    <button type="button" className={paymentMethod === 'EASY_PAY' ? 'selected' : ''} onClick={() => setPaymentMethod('EASY_PAY')}>간편결제</button>
                   </div>
                   <button type="button" className="primary" onClick={startPayment} disabled={isLoading}>결제하기</button>
                 </>
