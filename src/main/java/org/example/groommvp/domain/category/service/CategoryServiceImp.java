@@ -25,7 +25,7 @@ public class CategoryServiceImp implements CategoryService{
     @Transactional
     public CategoryResponse createLargeCategory(CategoryCreateRequest request) {
         //카테고리명 중복 확인
-        String categoryName = request.getCategoryName().trim();
+        String categoryName = request.getCategoryName();
         if (categoryRepository.existsByCategoryName(categoryName)) {
             throw new BusinessException(ErrorCode.CATEGORY_NAME_DUPLICATED);
         }
@@ -43,7 +43,7 @@ public class CategoryServiceImp implements CategoryService{
     @Transactional
     public CategoryResponse createMiddleCategory(Long parentId, CategoryCreateRequest request) {
         //카테고리명 중복 확인
-        String categoryName = request.getCategoryName().trim();
+        String categoryName = request.getCategoryName();
         if (categoryRepository.existsByCategoryName(categoryName)) {
             throw new BusinessException(ErrorCode.CATEGORY_NAME_DUPLICATED);
         }
@@ -70,12 +70,12 @@ public class CategoryServiceImp implements CategoryService{
     @Override
     @Transactional
     public CategoryResponse updateCategory(Long categoryId, CategoryUpdateRequest request) {
-        String categoryName = request.getCategoryName().trim();
+        String categoryName = request.getCategoryName();
         //카테고리 찾을 수 없을 때
         CategoryEntity category = categoryRepository.findById(categoryId)
                 .orElseThrow(()->new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
         //카테고리명 중복 확인
-        if (categoryRepository.existsByCategoryName(categoryName)) {
+        if (categoryRepository.existsByCategoryNameAndCategoryIdNot(categoryName, categoryId)) {
             throw new BusinessException(ErrorCode.CATEGORY_NAME_DUPLICATED);
         }
 

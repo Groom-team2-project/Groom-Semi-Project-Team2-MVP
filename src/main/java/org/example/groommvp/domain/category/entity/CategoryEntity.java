@@ -9,7 +9,13 @@ import lombok.Setter;
 
 @Entity
 @Getter
-@Table(name = "categories")
+@Table(
+        name = "categories",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_category_id",
+                columnNames = "category_name"
+        )
+)
 @NoArgsConstructor(access = lombok.AccessLevel.PROTECTED)
 public class CategoryEntity {
 

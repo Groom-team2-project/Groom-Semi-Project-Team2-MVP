@@ -10,6 +10,9 @@ public interface CategoryRepository extends JpaRepository<CategoryEntity, Long> 
     //카테고리명 중복 확인
     boolean existsByCategoryName(String categoryName);
 
+    //자신 제외 카테고리명 중복 확인
+    boolean existsByCategoryNameAndCategoryIdNot(String categoryName, Long categoryId);
+
     List<CategoryEntity> findAllByParentCategoryIsNullOrderByCategoryIdAsc();
 
     List<CategoryEntity> findAllByParentCategoryOrderByCategoryIdAsc(CategoryEntity parentCategory);
