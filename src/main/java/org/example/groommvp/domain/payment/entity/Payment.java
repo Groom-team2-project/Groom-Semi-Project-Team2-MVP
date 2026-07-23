@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import org.example.groommvp.domain.order.entity.Order;
 import org.example.groommvp.global.entity.BaseEntity;
+import org.example.groommvp.global.error.BusinessException;
+import org.example.groommvp.global.error.ErrorCode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -45,14 +47,18 @@ public class Payment extends BaseEntity {
 	@Column(length = 20)
 	private String method;              // 결제 수단 (예: CARD)
 
+	@Column(length = 200)
+	private String paymentKey;
+
 	private LocalDateTime paidAt;       // 결제 완료 시각
 	private LocalDateTime canceledAt;   // 환불/취소 시각
 
 	// 결제 생성 시 PENDING 상태로 시작
-	public Payment(Order order, Long amount, String method) {
+	public Payment(Order order, Long amount, String method, String paymentKey) {
 		this.order = order;
 		this.amount = amount;
 		this.method = method;
+		this.paymentKey = paymentKey;
 		this.status = PaymentStatus.PENDING;
 	}
 
@@ -65,5 +71,14 @@ public class Payment extends BaseEntity {
 	// 결제 실패: → FAILED
 	public void fail() {
 		this.status = PaymentStatus.FAILED;
+	}
+
+	// 환불: PAID → REFUNDED
+	public void refund() {
+		if (!status.isRefundable()) {
+			throw new BusinessException(ErrorCode.PAYMENT_NOT_REFUNDABLE);
+		}
+		this.status = PaymentStatus.REFUNDED;
+		this.canceledAt = LocalDateTime.now();
 	}
 }
