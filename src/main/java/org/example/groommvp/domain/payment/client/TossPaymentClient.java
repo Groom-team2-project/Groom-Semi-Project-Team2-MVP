@@ -15,13 +15,16 @@ public class TossPaymentClient {
 	private final RestClient restClient;
 	private final String secretKey;
 	private final String confirmUrl;
+	private final String cancelUrl;
 
 	public TossPaymentClient(
 		@Value("${toss.secret-key}") String secretKey,
-		@Value("${toss.confirm-url}") String confirmUrl
+		@Value("${toss.confirm-url}") String confirmUrl,
+		@Value("${toss.cancel-url}") String cancelUrl
 	) {
 		this.secretKey = secretKey;
 		this.confirmUrl = confirmUrl;
+		this.cancelUrl = cancelUrl;
 		this.restClient = RestClient.create();
 	}
 
@@ -40,5 +43,18 @@ public class TossPaymentClient {
 			.retrieve()
 			.toBodilessEntity();
 
+	}
+
+	public void cancel(String paymentKey, String cancelReason) {
+		String encodedAuth = Base64.getEncoder()
+			.encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
+
+		restClient.post()
+			.uri(cancelUrl, paymentKey)
+			.header("Authorization", "Basic " + encodedAuth)
+			.contentType(MediaType.APPLICATION_JSON)
+			.body(Map.of("cancelReason", cancelReason))
+			.retrieve()
+			.toBodilessEntity();
 	}
 }
