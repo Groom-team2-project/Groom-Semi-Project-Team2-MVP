@@ -42,8 +42,10 @@ public class OpenApiConfig {
                                 ```
 
                                 ### 인증/인가
-                                현재 코드 기준으로 SecurityConfig, JWT 필터, 인증/인가 정책은 적용되어 있지 않습니다.
-                                따라서 모든 API는 공개 API로 문서화되어 있으며, 인증 기능이 추가되면 security scheme과 401/403 응답을 함께 보강해야 합니다.
+                                일부 API는 자체 JWT access token 인증이 필요합니다.
+                                Swagger 우측 상단 **Authorize** 버튼에 발급받은 access token 값을 입력하면 인증 API를 테스트할 수 있습니다.
+                                인증이 필요한 API는 각 Operation에 `bearerAuth` 보안 요구사항이 표시됩니다.
+                                인증 정보가 없거나 유효하지 않으면 401, 권한이 부족하면 403 공통 에러 응답을 반환합니다.
 
                                 ### 재고 변동 타입 (StockHistoryType)
                                 | 타입 | 설명 |
