@@ -21,9 +21,11 @@ redis:
 app:
     jwt:
         secret: ${JWT_SECRET:local-dev-jwt-secret-key-change-before-deploy}
+        refresh-token-expiration-seconds: ${JWT_REFRESH_TOKEN_EXPIRATION_SECONDS:1209600}
     oauth:
         cookie-secure: ${OAUTH_COOKIE_SECURE:false}
 
 toss:
   secret-key: ${TOSS_SECRET_KEY}
   confirm-url: https://api.tosspayments.com/v1/payments/confirm
+  cancel-url: https://api.tosspayments.com/v1/payments/{paymentKey}/cancel

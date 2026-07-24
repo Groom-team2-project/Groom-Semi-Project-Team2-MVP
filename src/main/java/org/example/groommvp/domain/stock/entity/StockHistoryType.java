@@ -18,5 +18,14 @@ public enum StockHistoryType {
     DECREASE,
 
     /** 주문 취소로 인한 재고 복구 */
-    RESTORE
+    RESTORE,
+
+    /* 결제 전 재고를 임시로 잡아둠 */
+    RESERVE,
+
+    /* 결제 성공 후 실제 재고 차감 */
+    CONFIRM,
+
+    /* 결제 실패 후 예약 재고 해제 */
+    RELEASE,
 }

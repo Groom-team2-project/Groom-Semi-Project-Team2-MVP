@@ -2,7 +2,7 @@ package org.example.groommvp.global.config;
 
 import org.example.groommvp.domain.auth.security.JwtAuthenticationFilter;
 import org.example.groommvp.domain.auth.service.JwtTokenProvider;
-import org.springframework.http.HttpStatus;
+import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -25,12 +25,16 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
-                                response.setStatus(HttpStatus.UNAUTHORIZED.value()))
+                                SecurityErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 // 아래에 인증 필요 API 입력
-                                "/api/v1/members/me"
+                                "/api/v1/members/me",
+                                "/api/v1/members/me/**",
+                                "/api/v1/carts/**",
+                                "/api/v1/coupons/*/issue"
+                                "/api/v1/events/*/participate"
                                 /*
                                 "api/v1/orders/{orderId}",
                                 "api/v1/products/{productId}/orders"

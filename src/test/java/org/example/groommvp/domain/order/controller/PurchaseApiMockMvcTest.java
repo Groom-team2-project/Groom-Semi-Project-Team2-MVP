@@ -30,6 +30,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import org.example.groommvp.domain.order.entity.OrderStatus;
+import org.example.groommvp.domain.stock.entity.StockHistoryType;
+
 @SpringBootTest
 class PurchaseApiMockMvcTest {
 
@@ -68,7 +71,7 @@ class PurchaseApiMockMvcTest {
     }
 
     @Test
-    void purchaseApiCreatesOrderAndDecreasesStock() throws Exception {
+    void purchaseApiCreatesPendingOrderAndReservesStock() throws Exception {
         ProductEntity product = productRepository.save(new ProductEntity("MockMvc Product", 10000));
         StockEntity stock = stockRepository.save(new StockEntity(product, 10));
 
@@ -86,7 +89,11 @@ class PurchaseApiMockMvcTest {
 
         StockEntity savedStock = stockRepository.findById(stock.getStockId()).orElseThrow();
 
-        assertThat(savedStock.getStocks()).isEqualTo(7);
+        assertThat(savedStock.getStocks()).isEqualTo(10);
+        assertThat(savedStock.getReservedStocks()).isEqualTo(3);
+        assertThat(savedStock.getAvailableStocks()).isEqualTo(7);
+        assertThat(orderRepository.findAll().getFirst().getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(stockHistoryRepository.findAll().getFirst().getChangeType()).isEqualTo(StockHistoryType.RESERVE);
         assertThat(orderRepository.count()).isEqualTo(1);
         assertThat(orderItemRepository.count()).isEqualTo(1);
         assertThat(stockHistoryRepository.count()).isEqualTo(1);
@@ -261,9 +268,13 @@ class PurchaseApiMockMvcTest {
 
         assertThat(successCount.get()).isEqualTo(30);
         assertThat(conflictCount.get()).isEqualTo(70);
-        assertThat(savedStock.getStocks()).isZero();
+        assertThat(savedStock.getStocks()).isEqualTo(30);
+        assertThat(savedStock.getReservedStocks()).isEqualTo(30);
+        assertThat(savedStock.getAvailableStocks()).isZero();
         assertThat(orderRepository.count()).isEqualTo(30);
         assertThat(orderItemRepository.count()).isEqualTo(30);
         assertThat(stockHistoryRepository.count()).isEqualTo(30);
+        assertThat(stockHistoryRepository.findAll())
+                .allMatch(history -> history.getChangeType() == StockHistoryType.RESERVE);
     }
 }

@@ -8,16 +8,18 @@ import org.springframework.data.repository.query.Param;
 
 public interface CartRepository extends JpaRepository<CartEntity, Long> {
 
-    Optional<CartEntity> findByMemberId(Long memberId);
+    Optional<CartEntity> findByMember_MemberId(Long memberId);
 
     /**
-     * 회원의 장바구니를 항목·상품까지 한 번에 조회한다. (N+1 방지)
+     * 회원의 장바구니를 회원·항목·상품까지 한 번에 조회한다. (N+1 방지)
      *
      * <p>조회 화면/주문 전환처럼 항목 전체를 순회하는 경우에 사용한다.
+     * 지연 로딩된 회원 프록시 초기화를 피하려고 {@code member} 도 함께 fetch 한다.
      */
     @Query("select distinct c from CartEntity c "
+            + "join fetch c.member "
             + "left join fetch c.items i "
             + "left join fetch i.product "
-            + "where c.memberId = :memberId")
+            + "where c.member.memberId = :memberId")
     Optional<CartEntity> findByMemberIdWithItems(@Param("memberId") Long memberId);
 }

@@ -27,7 +27,10 @@ dependencies {
     implementation 'org.springframework.security:spring-security-oauth2-jose'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 
+    // Redisson: 분산락 (파트 C)
     implementation 'org.redisson:redisson:4.6.1'
+    // Spring Cache + Redis: 조회 캐싱/무효화 (파트 E)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

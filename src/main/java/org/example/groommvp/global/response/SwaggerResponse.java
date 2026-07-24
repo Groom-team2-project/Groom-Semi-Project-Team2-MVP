@@ -61,15 +61,15 @@ public final class SwaggerResponse {
     ) {
     }
 
-    @Schema(name = "PurchaseCommonResponse", description = "상품 구매 성공 응답")
+    @Schema(name = "PurchaseCommonResponse", description = "상품 주문 생성 및 재고 예약 성공 응답")
     public record PurchaseCommonResponse(
             @Schema(description = "요청 성공 여부", example = "true")
             boolean success,
-            @Schema(description = "구매 응답 데이터")
+            @Schema(description = "주문 생성 및 재고 예약 응답 데이터")
             PurchaseResponse data,
             @Schema(description = "성공 응답에서는 null", nullable = true, example = "null")
             String errorCode,
-            @Schema(description = "응답 메시지", nullable = true, example = "구매가 정상적으로 처리되었습니다.")
+            @Schema(description = "응답 메시지", nullable = true, example = "주문이 정상적으로 생성되었으며, 재고 예약이 완료되었습니다. 결제를 진행해주세요.")
             String message
     ) {
     }

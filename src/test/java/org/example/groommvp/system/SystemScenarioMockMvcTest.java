@@ -98,12 +98,12 @@ class SystemScenarioMockMvcTest {
 
         mockMvc.perform(get("/api/v1/products/{productId}", productId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.stocks").value(97));
+                .andExpect(jsonPath("$.data.stocks").value(100));
 
         mockMvc.perform(get("/api/v1/products/{productId}/stock-histories", productId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].type").value("DECREASE"))
+                .andExpect(jsonPath("$.data[0].type").value("RESERVE"))
                 .andExpect(jsonPath("$.data[0].changedQty").value(3))
                 .andExpect(jsonPath("$.data[1].type").value("INBOUND"));
 
@@ -166,14 +166,16 @@ class SystemScenarioMockMvcTest {
         assertThat(successCount.get()).isEqualTo(30);
         assertThat(conflictCount.get()).isEqualTo(70);
         assertThat(unexpectedCount.get()).isZero();
-        assertThat(stock.getStocks()).isZero();
+        assertThat(stock.getStocks()).isEqualTo(30);
+        assertThat(stock.getReservedStocks()).isEqualTo(30);
+        assertThat(stock.getAvailableStocks()).isZero();
         assertThat(orderRepository.count()).isEqualTo(30);
         assertThat(orderItemRepository.count()).isEqualTo(30);
         assertThat(stockHistoryRepository.count()).isEqualTo(31);
 
         mockMvc.perform(get("/api/v1/products/{productId}", productId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.stocks").value(0));
+                .andExpect(jsonPath("$.data.stocks").value(30));
     }
 
     private void createProduct(String name, int price, int stocks) throws Exception {
