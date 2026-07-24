@@ -26,6 +26,8 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
                                 SecurityErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                SecurityErrorResponseWriter.write(response, ErrorCode.FORBIDDEN))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
@@ -34,7 +36,8 @@ public class SecurityConfig {
                                 "/api/v1/members/me/**",
                                 "/api/v1/carts/**",
                                 "/api/v1/coupons/*/issue",
-                                "/api/v1/events/*/participate"
+                                "/api/v1/events/*/participate",
+                                "/api/v1/reviews"
                                 /*
                                 "api/v1/orders/{orderId}",
                                 "api/v1/products/{productId}/orders"
