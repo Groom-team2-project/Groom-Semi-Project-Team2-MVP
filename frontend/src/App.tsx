@@ -30,6 +30,15 @@ type LoginResponse = {
   newMember: boolean;
 };
 
+type MemberProfile = {
+  memberId?: number;
+  provider?: string;
+  email?: string;
+  nickname?: string;
+  role?: string;
+  status?: string;
+};
+
 type OrderItem = {
   orderItemId?: number;
   productId?: number;
@@ -51,6 +60,7 @@ type OrderDetail = {
 const TOKEN_KEY = 'soldout_access_token';
 const STATE_KEY = 'soldout_oauth_state';
 const PRODUCT_CACHE_KEY = 'soldout_products_cache';
+const ORDER_HISTORY_KEY = 'soldout_order_history';
 const PRODUCT_CACHE_TTL_MS = 60_000;
 const FRONT_CALLBACK_URI = `${window.location.origin}/oauth/kakao/callback`;
 
@@ -101,13 +111,33 @@ function writeProductCache(products: Product[]) {
   }));
 }
 
+function readOrderHistory(): OrderDetail[] {
+  const rawHistory = localStorage.getItem(ORDER_HISTORY_KEY);
+  if (!rawHistory) {
+    return [];
+  }
+
+  try {
+    const history = JSON.parse(rawHistory) as OrderDetail[];
+    return Array.isArray(history) ? history : [];
+  } catch {
+    localStorage.removeItem(ORDER_HISTORY_KEY);
+    return [];
+  }
+}
+
+function writeOrderHistory(history: OrderDetail[]) {
+  localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history.slice(0, 12)));
+}
+
 export default function App() {
   const cachedProducts = readProductCache();
+  const cachedOrders = readOrderHistory();
   const [routePath, setRoutePath] = useState(window.location.pathname);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '');
   const [state, setState] = useState(() => localStorage.getItem(STATE_KEY) ?? '');
   const [code, setCode] = useState('');
-  const [member, setMember] = useState<unknown>(null);
+  const [member, setMember] = useState<MemberProfile | null>(null);
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(12);
@@ -123,11 +153,13 @@ export default function App() {
   const [customMethod, setCustomMethod] = useState('GET');
   const [customPath, setCustomPath] = useState('/api/v1/products');
   const [customBody, setCustomBody] = useState('{\n  "quantity": 1\n}');
+  const [orderHistory, setOrderHistory] = useState<OrderDetail[]>(cachedOrders);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState('인기 상품을 둘러보고 바로 구매해보세요.');
   const [isLoading, setIsLoading] = useState(false);
 
   const isAdmin = routePath.startsWith('/admin');
+  const isMyPage = routePath.startsWith('/mypage');
   const isCheckout = routePath.startsWith('/checkout/');
   const isOrderPage = routePath.startsWith('/orders/');
   const isPaymentSuccess = routePath === '/payment/success';
@@ -140,8 +172,8 @@ export default function App() {
     if (!token) {
       return 'Guest';
     }
-    const nickname = getNested<string>(member, 'nickname');
-    const email = getNested<string>(member, 'email');
+    const nickname = member?.nickname;
+    const email = member?.email;
     return nickname || email || 'Member';
   }, [member, token]);
 
@@ -165,6 +197,10 @@ export default function App() {
       void confirmTossPayment();
     }
 
+    if (token) {
+      void loadMe(token);
+    }
+
     void getProducts(undefined, { quiet: true });
 
     if (checkoutProductId) {
@@ -180,8 +216,12 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  function navigate(path: string) {
-    window.history.pushState(null, '', path);
+  function navigate(path: string, options: { replace?: boolean } = {}) {
+    if (options.replace) {
+      window.history.replaceState(null, '', path);
+    } else {
+      window.history.pushState(null, '', path);
+    }
     setRoutePath(path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -196,6 +236,21 @@ export default function App() {
     setMember(null);
     localStorage.removeItem(TOKEN_KEY);
     setNotice('로그아웃되었습니다.');
+  }
+
+  function rememberOrder(order: OrderDetail) {
+    if (!order.orderId) {
+      return;
+    }
+
+    setOrderHistory((prev) => {
+      const next = [
+        order,
+        ...prev.filter((item) => item.orderId !== order.orderId)
+      ].slice(0, 12);
+      writeOrderHistory(next);
+      return next;
+    });
   }
 
   async function run<T = unknown>(
@@ -301,7 +356,7 @@ export default function App() {
   }
 
   async function loadMe(accessToken: string) {
-    const result = await run('내 정보 조회', 'GET', '/api/v1/members/me', undefined, false, accessToken);
+    const result = await run<MemberProfile>('내 정보 조회', 'GET', '/api/v1/members/me', undefined, false, accessToken);
     setMember(unwrapData(result));
   }
 
@@ -362,6 +417,8 @@ export default function App() {
   function startCheckout(product: Product) {
     chooseProduct(product);
     setQuantity(1);
+    setOrderId('');
+    setOrderDetail(null);
     if (product.productId !== undefined) {
       navigate(`/checkout/${product.productId}`);
     }
@@ -416,6 +473,12 @@ export default function App() {
   }
 
   async function purchase() {
+    if (orderId) {
+      setNotice(`이미 생성된 주문 #${orderId}로 이동합니다.`);
+      navigate(`/orders/${orderId}`, { replace: true });
+      return;
+    }
+
     const result = await run('상품 구매', 'POST', `/api/v1/products/${productId}/orders`, {
       quantity
     });
@@ -425,7 +488,7 @@ export default function App() {
       setOrderId(String(nextOrderId));
       setNotice(`주문이 생성되었습니다. 주문 번호는 ${nextOrderId}입니다.`);
       await loadOrder(String(nextOrderId));
-      navigate(`/orders/${nextOrderId}`);
+      navigate(`/orders/${nextOrderId}`, { replace: true });
     } else if (!result.ok) {
       setNotice('구매에 실패했습니다. 응답 로그를 확인해주세요.');
     }
@@ -446,6 +509,7 @@ export default function App() {
     if (data) {
       setOrderDetail(data);
       setOrderId(String(data.orderId ?? nextOrderId));
+      rememberOrder(data);
       setNotice('주문 정보를 불러왔습니다.');
     } else if (!result.ok) {
       setOrderDetail(null);
@@ -681,6 +745,81 @@ export default function App() {
     );
   }
 
+  if (isMyPage) {
+    return (
+      <main className="store-shell">
+        <StoreHeader
+          memberLabel={memberLabel}
+          token={token}
+          onLogin={getKakaoAuthorizeUrl}
+          onLogout={clearSession}
+          onNavigate={navigate}
+        />
+
+        <section className="mypage-layout">
+          <article className="profile-panel">
+            <p className="eyebrow">My Page</p>
+            <h1>마이페이지</h1>
+            <div className="profile-summary">
+              <div className="profile-avatar">{memberLabel.slice(0, 2).toUpperCase()}</div>
+              <div>
+                <strong>{memberLabel}</strong>
+                <span>{member?.email ?? '이메일 정보 없음'}</span>
+              </div>
+            </div>
+            <div className="profile-meta">
+              <span>회원 ID</span>
+              <strong>{member?.memberId ?? '-'}</strong>
+              <span>가입 경로</span>
+              <strong>{member?.provider ?? '-'}</strong>
+              <span>권한</span>
+              <strong>{member?.role ?? '-'}</strong>
+              <span>상태</span>
+              <strong>{member?.status ?? '-'}</strong>
+            </div>
+            <div className="profile-actions">
+              {token ? (
+                <button type="button" onClick={getMe} disabled={isLoading}>내 정보 새로고침</button>
+              ) : (
+                <button type="button" className="primary" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
+              )}
+              <button type="button" onClick={() => navigate('/')}>쇼핑 계속하기</button>
+            </div>
+          </article>
+
+          <article className="my-orders-panel">
+            <div className="section-heading compact">
+              <div>
+                <p className="eyebrow">Orders</p>
+                <h2>최근 주문</h2>
+              </div>
+            </div>
+
+            {orderHistory.length === 0 ? (
+              <div className="empty-state">표시할 주문이 없습니다.</div>
+            ) : (
+              <div className="my-order-list">
+                {orderHistory.map((order) => (
+                  <button
+                    type="button"
+                    className="my-order-row"
+                    key={order.orderId}
+                    onClick={() => navigate(`/orders/${order.orderId}`)}
+                  >
+                    <span>#{order.orderId}</span>
+                    <strong>{order.status ?? '-'}</strong>
+                    <span>{formatPrice(order.totalPrice)}</span>
+                    <small>{order.createdAt ?? '-'}</small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </article>
+        </section>
+      </main>
+    );
+  }
+
   if (isCheckout) {
     const currentStock = selectedProduct?.stocks;
     const maxQuantity = currentStock === undefined ? undefined : Math.max(currentStock, 1);
@@ -689,24 +828,13 @@ export default function App() {
 
     return (
       <main className="store-shell">
-        <header className="store-header">
-          <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>
-            <span className="brand-mark">S</span>
-            <span>SoldOut</span>
-          </a>
-          <nav className="store-nav" aria-label="주요 메뉴">
-            <a href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>Products</a>
-            <a href="/admin">Admin</a>
-          </nav>
-          <div className="member-chip">
-            <span>{memberLabel}</span>
-            {token ? (
-              <button type="button" onClick={clearSession}>로그아웃</button>
-            ) : (
-              <button type="button" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
-            )}
-          </div>
-        </header>
+        <StoreHeader
+          memberLabel={memberLabel}
+          token={token}
+          onLogin={getKakaoAuthorizeUrl}
+          onLogout={clearSession}
+          onNavigate={navigate}
+        />
 
         <section className="checkout-page">
           <button type="button" className="back-link" onClick={() => navigate('/')}>상품 목록으로 돌아가기</button>
@@ -822,24 +950,13 @@ export default function App() {
 
     return (
       <main className="store-shell">
-        <header className="store-header">
-          <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>
-            <span className="brand-mark">S</span>
-            <span>SoldOut</span>
-          </a>
-          <nav className="store-nav" aria-label="주요 메뉴">
-            <a href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>Products</a>
-            <a href="/admin">Admin</a>
-          </nav>
-          <div className="member-chip">
-            <span>{memberLabel}</span>
-            {token ? (
-              <button type="button" onClick={clearSession}>로그아웃</button>
-            ) : (
-              <button type="button" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
-            )}
-          </div>
-        </header>
+        <StoreHeader
+          memberLabel={memberLabel}
+          token={token}
+          onLogin={getKakaoAuthorizeUrl}
+          onLogout={clearSession}
+          onNavigate={navigate}
+        />
 
         <section className="order-page">
           <button type="button" className="back-link" onClick={() => navigate('/')}>상품 목록으로 돌아가기</button>
@@ -921,25 +1038,13 @@ export default function App() {
 
   return (
     <main className="store-shell">
-      <header className="store-header">
-        <a className="brand" href="/">
-          <span className="brand-mark">S</span>
-          <span>SoldOut</span>
-        </a>
-        <nav className="store-nav" aria-label="주요 메뉴">
-          <a href="#drops">Drops</a>
-          <a href="#products">Products</a>
-          <a href="/admin">Admin</a>
-        </nav>
-        <div className="member-chip">
-          <span>{memberLabel}</span>
-          {token ? (
-            <button type="button" onClick={clearSession}>로그아웃</button>
-          ) : (
-            <button type="button" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
-          )}
-        </div>
-      </header>
+      <StoreHeader
+        memberLabel={memberLabel}
+        token={token}
+        onLogin={getKakaoAuthorizeUrl}
+        onLogout={clearSession}
+        onNavigate={navigate}
+      />
 
       <section className="store-hero" id="drops">
         <div className="hero-copy">
@@ -1030,6 +1135,38 @@ function AdminHeader({
       <div className="member-chip">
         <span>{memberLabel}</span>
         {token ? <button type="button" onClick={onLogout}>로그아웃</button> : <button type="button" onClick={onLogin}>로그인</button>}
+      </div>
+    </header>
+  );
+}
+
+function StoreHeader({
+  memberLabel,
+  token,
+  onLogin,
+  onLogout,
+  onNavigate
+}: {
+  memberLabel: string;
+  token: string;
+  onLogin: () => void;
+  onLogout: () => void;
+  onNavigate: (path: string, options?: { replace?: boolean }) => void;
+}) {
+  return (
+    <header className="store-header">
+      <a className="brand" href="/" onClick={(event) => { event.preventDefault(); onNavigate('/'); }}>
+        <span className="brand-mark">S</span>
+        <span>SoldOut</span>
+      </a>
+      <nav className="store-nav" aria-label="주요 메뉴">
+        <a href="/" onClick={(event) => { event.preventDefault(); onNavigate('/'); }}>Products</a>
+        <a href="/mypage" onClick={(event) => { event.preventDefault(); onNavigate('/mypage'); }}>My Page</a>
+        <a href="/admin">Admin</a>
+      </nav>
+      <div className="member-chip">
+        <span>{memberLabel}</span>
+        {token ? <button type="button" onClick={onLogout}>로그아웃</button> : <button type="button" onClick={onLogin}>카카오 로그인</button>}
       </div>
     </header>
   );
