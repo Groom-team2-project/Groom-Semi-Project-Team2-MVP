@@ -72,10 +72,11 @@ public class ProductController {
                                     """)))
     })
     @PostMapping
-    public ResponseEntity<CommonResponse<ProductCreateResponse>> createProduct(@Valid @RequestBody ProductCreateRequest request) {
-        Long productId = productService.createProduct(request);
+    public ResponseEntity<CommonResponse<ProductResponse>> createProduct(
+            @Valid @RequestBody ProductCreateRequest request) {
+        ProductResponse response = productService.createProduct(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(CommonResponse.success(new ProductCreateResponse(productId), "상품 등록 성공"));
+                .body(CommonResponse.success(response, "상품 등록 성공"));
     }
 
     @Operation(summary = "상품 단건 조회", description = "상품 ID로 특정 상품의 상세 정보를 조회합니다.")
@@ -175,12 +176,12 @@ public class ProductController {
                                     """)))
     })
     @PutMapping("/{productId}")
-    public ResponseEntity<Void> updateProduct(
+    public ResponseEntity<CommonResponse<ProductResponse>> updateProduct(
             @Parameter(description = "상품 ID", example = "1", required = true)
             @PathVariable Long productId,
             @Valid @RequestBody ProductUpdateRequest request) {
-        productService.updateProduct(productId, request);
-        return ResponseEntity.noContent().build();
+        ProductResponse response = productService.updateProduct(productId, request);
+        return ResponseEntity.ok(CommonResponse.success(response, "상품 수정 성공"));
     }
 
     @Operation(summary = "상품 삭제", description = "상품을 삭제합니다.")
@@ -242,11 +243,11 @@ public class ProductController {
                                     """)))
     })
     @DeleteMapping("/{productId}")
-    public ResponseEntity<Void> deleteProduct(
+    public ResponseEntity<CommonResponse<ProductResponse>> deleteProduct(
             @Parameter(description = "상품 ID", example = "1", required = true)
             @PathVariable Long productId) {
-        productService.deleteProduct(productId);
-        return ResponseEntity.noContent().build();
+        ProductResponse response = productService.deleteProduct(productId);
+        return ResponseEntity.ok(CommonResponse.success(response, "상품 삭제 성공"));
     }
 
       // 검색

@@ -32,4 +32,14 @@ public class ProductCreateRequest {
     @NotNull(message = "등록할 제품의 수량을 입력하세요.")
     @Positive(message = "제품 수량은 0보다 커야 합니다.")
     private Integer stocks;
+
+    @Schema(description = "상품 이미지", example = "https://example.com/product.jpg",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "등록할 제품의 이미지을 입력하세요.")
+    private String imageUrl;
+
+    @Schema(description = "카테고리", example = "2",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "등록할 제품의 중분류 카테고리를 입력하세요.")
+    private Long categoryId;
 }
