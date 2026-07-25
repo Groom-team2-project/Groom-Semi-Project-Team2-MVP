@@ -48,6 +48,23 @@ type OrderDetail = {
   orderItems?: OrderItem[];
 };
 
+type CartItemView = {
+  cartItemId?: number;
+  productId?: number;
+  productName?: string;
+  productPrice?: number;
+  quantity?: number;
+  lineTotal?: number;
+};
+
+type CartView = {
+  cartId?: number | null;
+  memberId?: number;
+  items?: CartItemView[];
+  totalQuantity?: number;
+  totalPrice?: number;
+};
+
 const TOKEN_KEY = 'soldout_access_token';
 const STATE_KEY = 'soldout_oauth_state';
 const PRODUCT_CACHE_KEY = 'soldout_products_cache';
@@ -179,6 +196,7 @@ export default function App() {
   const [devSecret, setDevSecret] = useState('local-dev-jwt-secret-key-change-before-deploy');
   const [mEmail, setMEmail] = useState('');
   const [mNick, setMNick] = useState('');
+  const [cart, setCart] = useState<CartView | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState('인기 상품을 둘러보고 바로 구매해보세요.');
   const [isLoading, setIsLoading] = useState(false);
@@ -605,26 +623,36 @@ export default function App() {
   }
 
   // ===== E 파트: 장바구니 =====
+  // 장바구니를 변경/조회하는 API 는 모두 갱신된 CartResponse 를 돌려주므로, 그 결과로 화면 상태를 갱신한다.
+  function applyCart(res: ApiResult) {
+    if (res.ok) {
+      setCart(unwrapData<CartView>(res));
+    }
+  }
   async function getCart() {
-    await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true);
+    applyCart(await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true));
   }
   async function addCartItem() {
-    await run('장바구니 담기', 'POST', '/api/v1/carts/items', {
+    applyCart(await run('장바구니 담기', 'POST', '/api/v1/carts/items', {
       productId: Number(productId),
       quantity
-    }, true);
+    }, true));
   }
   async function updateCartItem() {
-    await run('장바구니 수량변경', 'PATCH', `/api/v1/carts/items/${cartItemId}`, { quantity }, true);
+    applyCart(await run('장바구니 수량변경', 'PATCH', `/api/v1/carts/items/${cartItemId}`, { quantity }, true));
   }
   async function removeCartItem() {
-    await run('장바구니 항목삭제', 'DELETE', `/api/v1/carts/items/${cartItemId}`, undefined, true);
+    applyCart(await run('장바구니 항목삭제', 'DELETE', `/api/v1/carts/items/${cartItemId}`, undefined, true));
   }
   async function clearCart() {
-    await run('장바구니 비우기', 'DELETE', '/api/v1/carts', undefined, true);
+    applyCart(await run('장바구니 비우기', 'DELETE', '/api/v1/carts', undefined, true));
   }
   async function cartCheckout() {
-    await run('장바구니 주문', 'POST', '/api/v1/carts/checkout', undefined, true);
+    const res = await run('장바구니 주문', 'POST', '/api/v1/carts/checkout', undefined, true);
+    if (res.ok) {
+      // 주문 전환 후 장바구니는 비워진다.
+      setCart({ cartId: null, items: [], totalQuantity: 0, totalPrice: 0 });
+    }
   }
 
   // ===== E 파트: 쿠폰 =====
@@ -675,6 +703,7 @@ export default function App() {
       productId: product.productId, quantity: qty
     }, true);
     if (res.ok) {
+      applyCart(res);
       setNotice(`'${product.productName ?? '상품'}'을(를) 장바구니에 담았습니다.`);
     }
   }
@@ -1266,6 +1295,31 @@ export default function App() {
                     <button type="button" className="primary" onClick={cartCheckout} disabled={isLoading}>주문(checkout)</button>
                   </div>
                 </div>
+
+                {cart && (cart.items?.length ?? 0) > 0 ? (
+                  <div className="order-items">
+                    {cart.items!.map((item, index) => (
+                      <div className="order-item-row" key={`${item.cartItemId}-${index}`}>
+                        <div className="mini-visual">{(item.productName ?? 'SO').slice(0, 2).toUpperCase()}</div>
+                        <div>
+                          <strong>{item.productName ?? `상품 #${item.productId ?? '-'}`}</strong>
+                          <span>수량 {item.quantity ?? '-'}개 · 단가 {formatPrice(item.productPrice)} · 항목ID {item.cartItemId ?? '-'}</span>
+                        </div>
+                        <p>{formatPrice(item.lineTotal)}</p>
+                      </div>
+                    ))}
+                    <div className="price-summary">
+                      <span>총 수량</span>
+                      <strong>{cart.totalQuantity ?? 0}개</strong>
+                      <span>총 금액</span>
+                      <strong>{formatPrice(cart.totalPrice)}</strong>
+                    </div>
+                  </div>
+                ) : cart ? (
+                  <div className="empty-state">장바구니가 비어 있습니다.</div>
+                ) : (
+                  <p className="hint">「조회」를 누르면 담긴 상품이 여기에 표시됩니다.</p>
+                )}
               </article>
 
               <article className="admin-card">
