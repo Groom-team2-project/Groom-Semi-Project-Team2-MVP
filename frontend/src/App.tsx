@@ -25,9 +25,19 @@ type LoginResponse = {
   tokenType: string;
   accessToken: string;
   expiresIn: number;
+  refreshToken?: string;
+  refreshTokenExpiresIn?: number;
   memberId: number;
   role: string;
   newMember: boolean;
+};
+
+type TokenReissueResponse = {
+  tokenType: string;
+  accessToken: string;
+  expiresIn: number;
+  refreshToken: string;
+  refreshTokenExpiresIn: number;
 };
 
 type MemberProfile = {
@@ -80,6 +90,7 @@ type LoadOrderOptions = {
 };
 
 const TOKEN_KEY = 'soldout_access_token';
+const REFRESH_TOKEN_KEY = 'soldout_refresh_token';
 const STATE_KEY = 'soldout_oauth_state';
 const PRODUCT_CACHE_KEY = 'soldout_products_cache';
 const ORDER_HISTORY_KEY = 'soldout_order_history';
@@ -223,6 +234,7 @@ export default function App() {
   const [routePath, setRoutePath] = useState(window.location.pathname);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '');
   const activeTokenRef = useRef(token);
+  const activeRefreshTokenRef = useRef(localStorage.getItem(REFRESH_TOKEN_KEY) ?? '');
   const [state, setState] = useState(() => localStorage.getItem(STATE_KEY) ?? '');
   const [code, setCode] = useState('');
   const [member, setMember] = useState<MemberProfile | null>(null);
@@ -347,31 +359,64 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function saveToken(nextToken: string) {
-    if (activeTokenRef.current !== nextToken) {
-      setMember(null);
-      setOrderHistory([]);
-      setOrderDetail(null);
-      setOrderId('');
-      setCart(null);
+  function resetAccountState() {
+    setMember(null);
+    setOrderHistory([]);
+    setOrderDetail(null);
+    setOrderId('');
+    setCart(null);
+  }
+
+  function saveToken(nextToken: string, nextRefreshToken?: string) {
+    const currentAccountId = decodeJwtMemberId(activeTokenRef.current);
+    const nextAccountId = decodeJwtMemberId(nextToken);
+    const isAccountChanged =
+      activeTokenRef.current !== nextToken
+      && (currentAccountId !== nextAccountId || !currentAccountId || !nextAccountId);
+
+    if (isAccountChanged) {
+      resetAccountState();
     }
 
     activeTokenRef.current = nextToken;
     setToken(nextToken);
     localStorage.setItem(TOKEN_KEY, nextToken);
+
+    if (nextRefreshToken) {
+      activeRefreshTokenRef.current = nextRefreshToken;
+      localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
+    } else {
+      activeRefreshTokenRef.current = '';
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
   }
 
-  function clearSession() {
+  function clearLocalSession(message = '로그아웃되었습니다.') {
     activeTokenRef.current = '';
+    activeRefreshTokenRef.current = '';
     setToken('');
-    setMember(null);
-    setOrderHistory([]);
-    setOrderDetail(null);
-    setOrderId('');
+    resetAccountState();
     localStorage.removeItem(TOKEN_KEY);
-    setNotice('로그아웃되었습니다.');
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    setNotice(message);
   }
 
+  async function clearSession() {
+    const refreshToken = activeRefreshTokenRef.current;
+
+    if (refreshToken) {
+      try {
+        await apiRequest('/api/v1/auth/logout', {
+          method: 'POST',
+          body: { refreshToken }
+        });
+      } catch {
+        // 로컬 세션 정리는 계속 진행한다.
+      }
+    }
+
+    clearLocalSession();
+  }
   function rememberOrder(order: OrderDetail, ownerMemberId?: number) {
     if (!order.orderId || !ownerMemberId) {
       return;
@@ -387,6 +432,27 @@ export default function App() {
     });
   }
 
+  async function reissueAccessToken() {
+    const refreshToken = activeRefreshTokenRef.current;
+    if (!refreshToken) {
+      return null;
+    }
+
+    const result = await apiRequest<TokenReissueResponse>('/api/v1/auth/reissue', {
+      method: 'POST',
+      body: { refreshToken }
+    });
+    const data = unwrapData<TokenReissueResponse>(result);
+
+    if (!result.ok || !data?.accessToken || !data.refreshToken) {
+      clearLocalSession('로그인이 만료되었습니다. 다시 로그인해주세요.');
+      return null;
+    }
+
+    saveToken(data.accessToken, data.refreshToken);
+    return data.accessToken;
+  }
+
   async function run<T = unknown>(
     label: string,
     method: string,
@@ -398,11 +464,25 @@ export default function App() {
     setIsLoading(true);
     const startedAt = performance.now();
     try {
-      const result = await apiRequest<T>(path, {
+      let requestToken = tokenOverride ?? (withToken ? activeTokenRef.current : undefined);
+      let result = await apiRequest<T>(path, {
         method,
         body,
-        token: tokenOverride ?? (withToken ? token : undefined)
+        token: requestToken
       });
+
+      const canReissue = withToken || tokenOverride === activeTokenRef.current;
+      if (canReissue && result.status === 401 && !path.startsWith('/api/v1/auth/')) {
+        const reissuedToken = await reissueAccessToken();
+        if (reissuedToken) {
+          requestToken = reissuedToken;
+          result = await apiRequest<T>(path, {
+            method,
+            body,
+            token: requestToken
+          });
+        }
+      }
 
       setLogs((prev) => [
         {
@@ -479,7 +559,7 @@ export default function App() {
     const data = unwrapData<LoginResponse>(result);
 
     if (data?.accessToken) {
-      saveToken(data.accessToken);
+      saveToken(data.accessToken, data.refreshToken);
       await loadMe(data.accessToken);
       setNotice('로그인되었습니다.');
     }
