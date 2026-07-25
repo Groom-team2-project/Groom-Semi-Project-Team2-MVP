@@ -348,6 +348,14 @@ export default function App() {
   }
 
   function saveToken(nextToken: string) {
+    if (activeTokenRef.current !== nextToken) {
+      setMember(null);
+      setOrderHistory([]);
+      setOrderDetail(null);
+      setOrderId('');
+      setCart(null);
+    }
+
     activeTokenRef.current = nextToken;
     setToken(nextToken);
     localStorage.setItem(TOKEN_KEY, nextToken);
