@@ -32,6 +32,18 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/api/v1/auth/**"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/*/stock").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/reviews/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
+                        .requestMatchers(
                                 "/api/v1/members/me",
                                 "/api/v1/members/me/**",
                                 "/api/v1/carts/**",
@@ -61,7 +73,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/categories/*/children").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/categories/*").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/*").hasRole("ADMIN")
-                        .anyRequest().permitAll()
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
