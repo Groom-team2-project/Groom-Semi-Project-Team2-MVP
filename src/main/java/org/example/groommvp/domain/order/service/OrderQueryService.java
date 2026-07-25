@@ -20,9 +20,13 @@ public class OrderQueryService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
 
-    public OrderResponse getOrder(Long orderId) {
+    public OrderResponse getOrder(Long orderId, Long memberId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+        if (memberId == null || order.getMemberId() == null || !order.getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.ORDER_FORBIDDEN);
+        }
+
         List<OrderItem> orderItems = orderItemRepository.findByOrderIdWithProduct(orderId);
 
         return OrderResponse.from(order, orderItems);

@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 public record PurchaseResponse(
         @Schema(description = "생성된 주문 ID", example = "42")
         Long orderId,
+        @Schema(description = "주문자 회원 ID (비회원 주문이면 null)", nullable = true, example = "1")
+        Long memberId,
         @Schema(description = "구매한 상품 ID", example = "1")
         Long productId,
         @Schema(description = "구매 수량", example = "3")

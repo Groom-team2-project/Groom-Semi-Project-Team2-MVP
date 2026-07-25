@@ -7,15 +7,20 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.example.groommvp.domain.auth.security.AuthMember;
 import org.example.groommvp.domain.order.dto.PurchaseRequest;
 import org.example.groommvp.domain.order.dto.PurchaseResponse;
 import org.example.groommvp.domain.order.service.PurchaseService;
+import org.example.groommvp.global.error.BusinessException;
+import org.example.groommvp.global.error.ErrorCode;
 import org.example.groommvp.global.response.CommonResponse;
 import org.example.groommvp.global.response.ErrorResponse;
 import org.example.groommvp.global.response.SwaggerResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,7 +40,11 @@ public class PurchaseController {
         this.purchaseService = purchaseService;
     }
 
-    @Operation(summary = "상품 주문 생성", description = "특정 상품을 지정한 수량만큼 주문하고 재고를 예약합니다. 주문은 결제 대기 상태로 생성됩니다.")
+    @Operation(
+            summary = "상품 주문 생성",
+            description = "인증된 회원이 특정 상품을 지정한 수량만큼 주문하고 재고를 예약합니다. 주문은 결제 대기 상태로 생성됩니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "주문 생성 및 재고 예약 성공",
                     content = @Content(mediaType = "application/json",
@@ -45,6 +54,7 @@ public class PurchaseController {
                                         "success": true,
                                         "data": {
                                             "orderId": 42,
+                                            "memberId": 1,
                                             "productId": 1,
                                             "purchasedQuantity": 3,
                                             "remainingStockQuantity": 47,
@@ -63,6 +73,17 @@ public class PurchaseController {
                                         "data": null,
                                         "errorCode": "INVALID_INPUT_VALUE",
                                         "message": "입력값이 올바르지 않습니다."
+                                    }
+                                    """))),
+            @ApiResponse(responseCode = "401", description = "인증 필요",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                        "success": false,
+                                        "data": null,
+                                        "errorCode": "UNAUTHORIZED",
+                                        "message": "인증이 필요합니다."
                                     }
                                     """))),
             @ApiResponse(responseCode = "404", description = "상품 또는 재고 정보를 찾을 수 없음",
@@ -113,9 +134,14 @@ public class PurchaseController {
     public ResponseEntity<CommonResponse<PurchaseResponse>> purchase(
             @Parameter(description = "상품 ID", example = "1", required = true)
             @PathVariable Long productId,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthMember authMember,
             @Valid @RequestBody PurchaseRequest request
     ) {
+        if (authMember == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(CommonResponse.success(purchaseService.purchase(productId, request), "주문이 정상적으로 생성되었으며, 재고 예약이 완료되었습니다. 결제를 진행해주세요."));
+                .body(CommonResponse.success(purchaseService.purchase(productId, authMember.memberId(), request), "주문이 정상적으로 생성되었으며, 재고 예약이 완료되었습니다. 결제를 진행해주세요."));
     }
 }
