@@ -51,7 +51,7 @@ class StockServiceConcurrencyTest {
     @DisplayName("N명이 동시에 1개씩 입고하면 재고가 정확히 N만큼 증가하고 이력도 N건 남는다")
     void concurrentStockInIncreasesExactly() throws InterruptedException {
         // given
-        ProductEntity product = productRepository.save(new ProductEntity("동시입고상품", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("동시입고상품").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 0));
 
         int threadCount = 100;

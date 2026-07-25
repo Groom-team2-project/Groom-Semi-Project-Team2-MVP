@@ -72,7 +72,7 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void purchaseApiCreatesPendingOrderAndReservesStock() throws Exception {
-        ProductEntity product = productRepository.save(new ProductEntity("MockMvc Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("MockMvc Product").productPrice(10000).build());
         StockEntity stock = stockRepository.save(new StockEntity(product, 10));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
@@ -101,7 +101,7 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void purchaseApiReturnsBadRequestWhenQuantityIsZero() throws Exception {
-        ProductEntity product = productRepository.save(new ProductEntity("Invalid Quantity Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("Invalid Quantity Product").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 10));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
@@ -121,7 +121,7 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void purchaseApiReturnsBadRequestWhenRequestBodyHasInvalidType() throws Exception {
-        ProductEntity product = productRepository.save(new ProductEntity("Invalid Body Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("Invalid Body Product").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 10));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
@@ -167,7 +167,7 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void purchaseApiReturnsNotFoundWhenStockDoesNotExist() throws Exception {
-        ProductEntity product = productRepository.save(new ProductEntity("No Stock Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("No Stock Product").productPrice(10000).build());
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,7 +186,7 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void purchaseApiReturnsConflictWhenStockIsNotEnough() throws Exception {
-        ProductEntity product = productRepository.save(new ProductEntity("Limited Stock Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("Limited Stock Product").productPrice(10000).build());
         StockEntity stock = stockRepository.save(new StockEntity(product, 1));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
@@ -218,7 +218,7 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void concurrentPurchaseApiCannotExceedStock() throws Exception {
-        ProductEntity product = productRepository.save(new ProductEntity("Concurrent API Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("Concurrent API Product").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 30));
 
         int requestCount = 100;

@@ -49,7 +49,7 @@ class OrderCancelConcurrencyTest {
     @DisplayName("같은 주문에 동시에 100개 취소 요청이 와도 딱 1번만 취소되고 재고도 1번만 복구된다")
     void concurrentCancel_onlyOnce() throws InterruptedException {
         // given: 상품 / 재고(0) / 주문(COMPLETED) / 주문품목(2개) 준비
-        ProductEntity product = productRepository.save(new ProductEntity("Test Product", 10000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("Test Product").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 0));                 // 취소 전 재고 0
         Order order = orderRepository.save(new Order(20000L));             // COMPLETED 주문
         orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 구매했던 품목
