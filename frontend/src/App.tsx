@@ -57,6 +57,23 @@ type OrderDetail = {
   orderItems?: OrderItem[];
 };
 
+type CartItemView = {
+  cartItemId?: number;
+  productId?: number;
+  productName?: string;
+  productPrice?: number;
+  quantity?: number;
+  lineTotal?: number;
+};
+
+type CartView = {
+  cartId?: number | null;
+  memberId?: number;
+  items?: CartItemView[];
+  totalQuantity?: number;
+  totalPrice?: number;
+};
+
 const TOKEN_KEY = 'soldout_access_token';
 const STATE_KEY = 'soldout_oauth_state';
 const PRODUCT_CACHE_KEY = 'soldout_products_cache';
@@ -77,6 +94,40 @@ function formatPrice(price?: number) {
 
 function productInitial(product?: Product | null) {
   return product?.productName?.slice(0, 2).toUpperCase() ?? 'SO';
+}
+
+// JWT payload 의 role 클레임을 디코드한다. (서명 검증은 서버 몫; 프론트는 화면 분기용)
+function decodeJwtRole(token: string): string | null {
+  if (!token) {
+    return null;
+  }
+  const parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64)) as { role?: string };
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================================
+// TODO [DEV-ONLY · 배포 전 삭제]: 아래 base64UrlFromBytes / genDevToken 및 관련
+// 상태(devMemberId/devRole/devSecret)와 UI(🔧 테스트용 토큰 발급 카드)는 카카오
+// 로그인 없이 로컬 테스트용 JWT 를 만드는 코드입니다. 운영 배포 전 반드시 제거하세요.
+// (JWT_SECRET 만 알면 임의 회원/권한 토큰을 위조할 수 있으므로 운영에 남으면 보안 취약점)
+// 검색 태그: DEV-ONLY
+// ============================================================================
+// 테스트용: 바이트 배열을 base64url(no padding) 로 인코딩. dev JWT 서명에 사용.
+function base64UrlFromBytes(bytes: Uint8Array): string {
+  let binary = '';
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function createLogId() {
@@ -167,19 +218,46 @@ export default function App() {
   const [customPath, setCustomPath] = useState('/api/v1/products');
   const [customBody, setCustomBody] = useState('{\n  "quantity": 1\n}');
   const [orderHistory, setOrderHistory] = useState<OrderDetail[]>([]);
+  // E 파트(장바구니/쿠폰/포인트) 입력값
+  const [cartItemId, setCartItemId] = useState('');
+  const [couponId, setCouponId] = useState('1');
+  const [couponBody, setCouponBody] = useState(
+    '{\n' +
+    '  "couponName": "신규가입 10% 할인",\n' +
+    '  "discountType": "RATE",\n' +
+    '  "discountValue": 10,\n' +
+    '  "maxDiscountAmount": 5000,\n' +
+    '  "minOrderAmount": 10000,\n' +
+    '  "totalQuantity": 100,\n' +
+    '  "issueStartAt": "2026-01-01T00:00:00",\n' +
+    '  "issueEndAt": "2026-12-31T23:59:59",\n' +
+    '  "validDays": 30\n' +
+    '}'
+  );
+  // DEV-ONLY [배포 전 삭제]: 테스트용 dev 토큰 생성 입력값 (카카오 없이 로컬 인증)
+  const [devMemberId, setDevMemberId] = useState('1');
+  const [devRole, setDevRole] = useState('ADMIN');
+  const [devSecret, setDevSecret] = useState('local-dev-jwt-secret-key-change-before-deploy');
+  const [mEmail, setMEmail] = useState('');
+  const [mNick, setMNick] = useState('');
+  const [cart, setCart] = useState<CartView | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState('인기 상품을 둘러보고 바로 구매해보세요.');
   const [isLoading, setIsLoading] = useState(false);
 
   const isAdmin = routePath.startsWith('/admin');
-  const isMyPage = routePath.startsWith('/mypage');
+  const isOrderHistoryPage = routePath.startsWith('/mypage');
   const isCheckout = routePath.startsWith('/checkout/');
   const isOrderPage = routePath.startsWith('/orders/');
   const isPaymentSuccess = routePath === '/payment/success';
   const isPaymentFail = routePath === '/payment/fail';
+  const isMyPage = routePath === '/my';
   const checkoutProductId = isCheckout ? routePath.split('/')[2] : '';
   const routeOrderId = isOrderPage ? routePath.split('/')[2] : '';
   const visibleProducts = products;
+
+  const currentRole = useMemo(() => decodeJwtRole(token), [token]);
+  const isAdminUser = currentRole === 'ADMIN';
 
   const memberLabel = useMemo(() => {
     if (!token) {
@@ -630,6 +708,180 @@ export default function App() {
     await run('직접 API 호출', customMethod, customPath, body, true);
   }
 
+  // ===== E 파트: 장바구니 =====
+  // 장바구니를 변경/조회하는 API 는 모두 갱신된 CartResponse 를 돌려주므로, 그 결과로 화면 상태를 갱신한다.
+  function applyCart(res: ApiResult) {
+    if (res.ok) {
+      setCart(unwrapData<CartView>(res));
+    }
+  }
+  async function getCart() {
+    applyCart(await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true));
+  }
+  async function addCartItem() {
+    applyCart(await run('장바구니 담기', 'POST', '/api/v1/carts/items', {
+      productId: Number(productId),
+      quantity
+    }, true));
+  }
+  async function updateCartItem() {
+    applyCart(await run('장바구니 수량변경', 'PATCH', `/api/v1/carts/items/${cartItemId}`, { quantity }, true));
+  }
+  async function removeCartItem() {
+    applyCart(await run('장바구니 항목삭제', 'DELETE', `/api/v1/carts/items/${cartItemId}`, undefined, true));
+  }
+  async function clearCart() {
+    applyCart(await run('장바구니 비우기', 'DELETE', '/api/v1/carts', undefined, true));
+  }
+  async function cartCheckout() {
+    const res = await run('장바구니 주문', 'POST', '/api/v1/carts/checkout', undefined, true);
+    if (res.ok) {
+      // 주문 전환 후 장바구니는 비워진다.
+      setCart({ cartId: null, items: [], totalQuantity: 0, totalPrice: 0 });
+    }
+  }
+
+  // ===== E 파트: 쿠폰 =====
+  async function getMyCoupons() {
+    await run('내 쿠폰 목록', 'GET', '/api/v1/members/me/coupons', undefined, true);
+  }
+  async function issueCoupon() {
+    await run('쿠폰 발급', 'POST', `/api/v1/coupons/${couponId}/issue`, undefined, true);
+  }
+  async function createCoupon() {
+    let body: unknown;
+    try {
+      body = JSON.parse(couponBody);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'JSON 형식이 올바르지 않습니다.';
+      setNotice(`쿠폰 본문 JSON을 확인해주세요: ${message}`);
+      return;
+    }
+    await run('쿠폰 등록(ADMIN)', 'POST', '/api/v1/admin/coupons', body, true);
+  }
+
+  // ===== E 파트: 포인트 =====
+  async function getPointBalance() {
+    await run('포인트 잔액', 'GET', '/api/v1/members/me/points', undefined, true);
+  }
+  async function getPointHistories() {
+    await run('포인트 이력', 'GET', '/api/v1/members/me/points/histories', undefined, true);
+  }
+  async function updateMe() {
+    const body: Record<string, string> = {};
+    if (mEmail.trim()) body.email = mEmail.trim();
+    if (mNick.trim()) body.nickname = mNick.trim();
+    await run('프로필 수정', 'PATCH', '/api/v1/members/me', body, true);
+  }
+
+  // 스토어에서 특정 상품을 장바구니에 담는다. (로그인 필요)
+  async function addProductToCart(product: Product, qty = 1) {
+    if (!token) {
+      setNotice('로그인이 필요합니다. 마이페이지에서 토큰을 발급하세요.');
+      return;
+    }
+    if (!product.productId) {
+      setNotice('상품 ID가 없어 담을 수 없습니다.');
+      return;
+    }
+    chooseProduct(product);
+    const res = await run('장바구니 담기', 'POST', '/api/v1/carts/items', {
+      productId: product.productId, quantity: qty
+    }, true);
+    if (res.ok) {
+      applyCart(res);
+      setNotice(`'${product.productName ?? '상품'}'을(를) 장바구니에 담았습니다.`);
+    }
+  }
+
+  // ===== DEV-ONLY [배포 전 삭제]: dev JWT 생성 (카카오 없이, HS256, 로컬 테스트 전용) =====
+  async function genDevToken() {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const header = { alg: 'HS256', typ: 'JWT' };
+      const payload = {
+        sub: String(devMemberId || '1'),
+        role: devRole,
+        provider: 'KAKAO',
+        iat: now,
+        exp: now + 7200
+      };
+      const encoder = new TextEncoder();
+      const encodePart = (value: unknown) => base64UrlFromBytes(encoder.encode(JSON.stringify(value)));
+      const signingInput = `${encodePart(header)}.${encodePart(payload)}`;
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(devSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(signingInput));
+      const jwt = `${signingInput}.${base64UrlFromBytes(new Uint8Array(signature))}`;
+      saveToken(jwt);
+      setNotice(`dev 토큰 생성됨 · memberId=${payload.sub} · ${devRole} (앱 JWT_SECRET 과 secret 이 같아야 통과)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setNotice(`dev 토큰 생성 실패: ${message}`);
+    }
+  }
+
+  if (isAdmin && !isAdminUser) {
+    return (
+      <main className="admin-shell">
+        <AdminHeader memberLabel={memberLabel} token={token} onLogin={getKakaoAuthorizeUrl} onLogout={clearSession} />
+        <section className="admin-hero">
+          <div>
+            <p className="eyebrow">Admin Console</p>
+            <h1>접근 권한이 없습니다</h1>
+            <p>
+              {token
+                ? `이 페이지는 ADMIN 계정만 접근할 수 있습니다. (현재 권한: ${currentRole ?? '알 수 없음'})`
+                : '로그인이 필요합니다. ADMIN 권한이 있는 계정으로 로그인하세요.'}
+            </p>
+            <div className="two-col" style={{ marginTop: '16px' }}>
+              <button type="button" onClick={() => navigate('/')}>스토어로 이동</button>
+              {!token && (
+                <button type="button" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>
+                  카카오 로그인
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* DEV-ONLY [배포 전 삭제]: 접근거부 화면의 테스트용 토큰 발급 카드 */}
+        <section className="admin-grid">
+          <article className="admin-card span-2">
+            <div className="card-heading">
+              <div>
+                <p className="eyebrow">Dev</p>
+                <h2>🔧 테스트용 토큰 발급</h2>
+              </div>
+            </div>
+            <div className="admin-form">
+              <p className="hint">카카오 로그인 없이 로컬 테스트용 토큰을 만듭니다. admin 콘솔을 보려면 role 을 ADMIN 으로 발급하세요.</p>
+              <div className="two-col">
+                <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
+                <label>role
+                  <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
+                    <option>USER</option>
+                    <option>ADMIN</option>
+                  </select>
+                </label>
+              </div>
+              <label>secret (앱 JWT_SECRET 과 동일해야 함)<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
+              <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성 후 입장</button>
+              {token && (
+                <p className="hint">현재 토큰 권한: {currentRole ?? '알 수 없음'} — ADMIN 으로 생성하면 이 화면이 admin 콘솔로 바뀝니다.</p>
+              )}
+            </div>
+          </article>
+        </section>
+      </main>
+    );
+  }
+
   if (isAdmin) {
     return (
       <main className="admin-shell">
@@ -726,6 +978,19 @@ export default function App() {
               <label>state<input value={state} onChange={(event) => setState(event.target.value)} /></label>
               <button type="button" onClick={() => completeKakaoLogin()} disabled={!code || !state || isLoading}>JWT 발급</button>
               <label>JWT<textarea value={token} onChange={(event) => saveToken(event.target.value.trim())} rows={4} /></label>
+              {/* DEV-ONLY [배포 전 삭제]: 아래 dev 토큰 생성 UI 는 로컬 테스트 전용 */}
+              <p className="hint">🔧 테스트용 dev 토큰 (카카오 없이 발급)</p>
+              <div className="two-col">
+                <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
+                <label>role
+                  <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
+                    <option>USER</option>
+                    <option>ADMIN</option>
+                  </select>
+                </label>
+              </div>
+              <label>secret (앱 JWT_SECRET 과 동일해야 함)<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
+              <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성</button>
             </div>
           </article>
 
@@ -750,6 +1015,20 @@ export default function App() {
             <textarea value={customBody} onChange={(event) => setCustomBody(event.target.value)} rows={6} />
           </article>
 
+          <article className="admin-card">
+            <div className="card-heading">
+              <div>
+                <p className="eyebrow">Coupon</p>
+                <h2>쿠폰 등록</h2>
+              </div>
+            </div>
+            <div className="admin-form">
+              <label>쿠폰 정보 (JSON)<textarea value={couponBody} onChange={(event) => setCouponBody(event.target.value)} rows={8} /></label>
+              <button type="button" className="primary" onClick={createCoupon} disabled={isLoading}>쿠폰 등록</button>
+              <p className="hint">ADMIN 전용. 등록한 쿠폰은 사용자가 마이페이지에서 발급받습니다.</p>
+            </div>
+          </article>
+
           <article className="admin-card span-2">
             <div className="card-heading">
               <div>
@@ -765,7 +1044,7 @@ export default function App() {
     );
   }
 
-  if (isMyPage) {
+  if (isOrderHistoryPage) {
     return (
       <main className="store-shell">
         <StoreHeader
@@ -1061,6 +1340,172 @@ export default function App() {
     );
   }
 
+  if (isMyPage) {
+    return (
+      <main className="store-shell">
+        <header className="store-header">
+          <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>
+            <span className="brand-mark">S</span>
+            <span>SoldOut</span>
+          </a>
+          <nav className="store-nav" aria-label="주요 메뉴">
+            <a href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>Products</a>
+            <a href="/my" onClick={(event) => { event.preventDefault(); navigate('/my'); }}>마이페이지</a>
+            <a href="/admin">Admin</a>
+          </nav>
+          <div className="member-chip">
+            <span>{memberLabel}</span>
+            {token ? (
+              <button type="button" onClick={clearSession}>로그아웃</button>
+            ) : (
+              <button type="button" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
+            )}
+          </div>
+        </header>
+
+        <section className="admin-hero">
+          <div>
+            <p className="eyebrow">My Page</p>
+            <h1>마이페이지</h1>
+            <p>{token ? `${memberLabel} 님, 장바구니·쿠폰·포인트를 확인하세요. (권한: ${currentRole ?? '-'})` : '로그인 후 이용할 수 있습니다. 아래에서 테스트용 토큰을 발급하세요.'}</p>
+          </div>
+        </section>
+
+        <section className="admin-grid">
+          {!token ? (
+            /* DEV-ONLY [배포 전 삭제]: 마이페이지의 테스트용 토큰 발급 카드 */
+            <article className="admin-card span-2">
+              <div className="card-heading">
+                <div>
+                  <p className="eyebrow">Dev</p>
+                  <h2>🔧 테스트용 토큰 발급</h2>
+                </div>
+              </div>
+              <div className="admin-form">
+                <p className="hint">카카오 없이 로컬 테스트용 토큰을 만듭니다. 일반 사용자 화면은 role 을 USER 로 발급하세요.</p>
+                <div className="two-col">
+                  <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
+                  <label>role
+                    <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
+                      <option>USER</option>
+                      <option>ADMIN</option>
+                    </select>
+                  </label>
+                </div>
+                <label>secret<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
+                <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성</button>
+              </div>
+            </article>
+          ) : (
+            <>
+              <article className="admin-card">
+                <div className="card-heading">
+                  <div>
+                    <p className="eyebrow">Member</p>
+                    <h2>내 정보</h2>
+                  </div>
+                  <button type="button" onClick={getMe} disabled={isLoading}>조회</button>
+                </div>
+                <div className="admin-form">
+                  <label>이메일<input value={mEmail} onChange={(event) => setMEmail(event.target.value)} placeholder="new@example.com" /></label>
+                  <label>닉네임<input value={mNick} onChange={(event) => setMNick(event.target.value)} placeholder="새 닉네임" /></label>
+                  <button type="button" className="primary" onClick={updateMe} disabled={isLoading}>프로필 수정</button>
+                </div>
+              </article>
+
+              <article className="admin-card">
+                <div className="card-heading">
+                  <div>
+                    <p className="eyebrow">Cart</p>
+                    <h2>장바구니</h2>
+                  </div>
+                  <button type="button" onClick={getCart} disabled={isLoading}>조회</button>
+                </div>
+                <div className="admin-form">
+                  <label>상품 ID<input value={productId} onChange={(event) => setProductId(event.target.value)} /></label>
+                  <label>수량<input type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
+                  <button type="button" className="primary" onClick={addCartItem} disabled={!productId || isLoading}>담기</button>
+                  <label>장바구니 항목 ID<input value={cartItemId} onChange={(event) => setCartItemId(event.target.value)} /></label>
+                  <div className="two-col">
+                    <button type="button" onClick={updateCartItem} disabled={!cartItemId || isLoading}>수량변경</button>
+                    <button type="button" onClick={removeCartItem} disabled={!cartItemId || isLoading}>항목삭제</button>
+                  </div>
+                  <div className="two-col">
+                    <button type="button" onClick={clearCart} disabled={isLoading}>비우기</button>
+                    <button type="button" className="primary" onClick={cartCheckout} disabled={isLoading}>주문(checkout)</button>
+                  </div>
+                </div>
+
+                {cart && (cart.items?.length ?? 0) > 0 ? (
+                  <div className="order-items">
+                    {cart.items!.map((item, index) => (
+                      <div className="order-item-row" key={`${item.cartItemId}-${index}`}>
+                        <div className="mini-visual">{(item.productName ?? 'SO').slice(0, 2).toUpperCase()}</div>
+                        <div>
+                          <strong>{item.productName ?? `상품 #${item.productId ?? '-'}`}</strong>
+                          <span>수량 {item.quantity ?? '-'}개 · 단가 {formatPrice(item.productPrice)} · 항목ID {item.cartItemId ?? '-'}</span>
+                        </div>
+                        <p>{formatPrice(item.lineTotal)}</p>
+                      </div>
+                    ))}
+                    <div className="price-summary">
+                      <span>총 수량</span>
+                      <strong>{cart.totalQuantity ?? 0}개</strong>
+                      <span>총 금액</span>
+                      <strong>{formatPrice(cart.totalPrice)}</strong>
+                    </div>
+                  </div>
+                ) : cart ? (
+                  <div className="empty-state">장바구니가 비어 있습니다.</div>
+                ) : (
+                  <p className="hint">「조회」를 누르면 담긴 상품이 여기에 표시됩니다.</p>
+                )}
+              </article>
+
+              <article className="admin-card">
+                <div className="card-heading">
+                  <div>
+                    <p className="eyebrow">Coupon</p>
+                    <h2>쿠폰</h2>
+                  </div>
+                  <button type="button" onClick={getMyCoupons} disabled={isLoading}>내 쿠폰</button>
+                </div>
+                <div className="admin-form">
+                  <label>쿠폰 ID<input value={couponId} onChange={(event) => setCouponId(event.target.value)} /></label>
+                  <button type="button" className="primary" onClick={issueCoupon} disabled={!couponId || isLoading}>발급받기</button>
+                </div>
+              </article>
+
+              <article className="admin-card">
+                <div className="card-heading">
+                  <div>
+                    <p className="eyebrow">Point</p>
+                    <h2>포인트</h2>
+                  </div>
+                </div>
+                <div className="admin-form">
+                  <button type="button" onClick={getPointBalance} disabled={isLoading}>잔액 조회</button>
+                  <button type="button" onClick={getPointHistories} disabled={isLoading}>이력 조회</button>
+                </div>
+              </article>
+
+              <article className="admin-card span-2">
+                <div className="card-heading">
+                  <div>
+                    <p className="eyebrow">Logs</p>
+                    <h2>응답 로그</h2>
+                  </div>
+                  <button type="button" onClick={() => setLogs([])}>비우기</button>
+                </div>
+                <LogList logs={logs} />
+              </article>
+            </>
+          )}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="store-shell">
       <StoreHeader
@@ -1122,7 +1567,7 @@ export default function App() {
                 <small>{product.stocks === undefined ? '재고 확인 중' : `남은 재고 ${product.stocks}개`}</small>
               </div>
               <div className="store-card-footer">
-                <button type="button" onClick={() => chooseProduct(product)}>담기</button>
+                <button type="button" onClick={() => addProductToCart(product)} disabled={isLoading}>담기</button>
                 <button type="button" className="primary" onClick={() => startCheckout(product)}>
                   구매 선택
                 </button>

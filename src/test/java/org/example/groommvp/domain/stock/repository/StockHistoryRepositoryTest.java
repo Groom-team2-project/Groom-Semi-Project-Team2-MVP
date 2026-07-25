@@ -38,7 +38,7 @@ class StockHistoryRepositoryTest {
     @DisplayName("StockHistory 저장 시 stock 연관관계와 생성 시각이 정상 매핑된다")
     void save_and_association() {
         // given
-        ProductEntity product = productRepository.save(new ProductEntity("후드티", 30000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("후드티").productPrice(30000).build());
         StockEntity stock = stockRepository.save(new StockEntity(product, 20));
         StockHistoryEntity history = StockHistoryEntity.inbound(stock, 20, "신규 입고");
 
@@ -59,13 +59,13 @@ class StockHistoryRepositoryTest {
     @DisplayName("findHistoriesByProductId 는 해당 상품의 이력만 조회한다")
     void findHistoriesByProductId_onlyThatProduct() {
         // given: 대상 상품의 이력 2건
-        ProductEntity product = productRepository.save(new ProductEntity("바지", 40000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("바지").productPrice(40000).build());
         StockEntity stock = stockRepository.save(new StockEntity(product, 0));
         stockHistoryRepository.save(StockHistoryEntity.inbound(stock, 5, "1차"));
         stockHistoryRepository.save(StockHistoryEntity.inbound(stock, 7, "2차"));
 
         // and: 다른 상품의 이력 1건 (조회되면 안 됨)
-        ProductEntity other = productRepository.save(new ProductEntity("셔츠", 20000));
+        ProductEntity other = productRepository.save(ProductEntity.builder().productName("셔츠").productPrice(20000).build());
         StockEntity otherStock = stockRepository.save(new StockEntity(other, 0));
         stockHistoryRepository.save(StockHistoryEntity.inbound(otherStock, 3, "타상품"));
 

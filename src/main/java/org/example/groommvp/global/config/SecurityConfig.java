@@ -20,9 +20,9 @@ public class SecurityConfig {
         JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtTokenProvider);
 
         return http
-                .csrf(AbstractHttpConfigurer::disable) // OAuth만 사용하므로 CSRF도 끔. 단, 자체 로그인 제작시 해당 항목 삭제할 것.
+                .csrf(AbstractHttpConfigurer::disable) // OAuth留??ъ슜?섎?濡?CSRF???? ?? ?먯껜 濡쒓렇???쒖옉???대떦 ??ぉ ??젣??寃?
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable) // 폼 로그인 기능 명시적 제거
+                .formLogin(AbstractHttpConfigurer::disable) // ??濡쒓렇??湲곕뒫 紐낆떆???쒓굅
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/reviews").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/*").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/reviews/*").authenticated()
+                        .requestMatchers("/api/v1/admin/coupons/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/products").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/products/*").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/products/*").hasRole("ADMIN")

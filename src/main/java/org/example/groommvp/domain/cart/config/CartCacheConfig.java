@@ -4,7 +4,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.interceptor.CacheErrorHandler;
+import org.springframework.cache.interceptor.LoggingCacheErrorHandler;
+import org.springframework.cache.transaction.TransactionAwareCacheManagerProxy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -37,10 +42,18 @@ import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
  *
  * <p><b>TTL:</b> 무효화(evict)가 주 수단이고, TTL 은 안전망이다. 무효화 경로를 하나 빠뜨렸을 때
  * stale 데이터가 영원히 남지 않도록 한다.
+ *
+ * <p><b>장애 흡수:</b> {@link CachingConfigurer#errorHandler()} 로 로깅 후 무시하는 핸들러를 등록해,
+ * Redis 장애 시 캐시 조회/저장/무효화 예외가 그대로 전파되어 DB 로 대체 가능한 요청까지
+ * 실패하는 일을 막는다. (가용성 우선 — evict 실패로 남는 stale 은 TTL 이 안전망이다.)
+ *
+ * <p><b>트랜잭션 정합:</b> 캐시 매니저를 {@link TransactionAwareCacheManagerProxy} 로 감싸
+ * {@code put}/{@code evict} 가 트랜잭션 <b>커밋 이후</b>에 반영되게 한다. 이로써 커밋 전에 evict
+ * 된 틈에 동시 조회가 옛 값을 재적재하는 레이스를 줄이고, 롤백된 변경이 캐시에 새지 않게 한다.
  */
 @Configuration
 @EnableCaching
-public class CartCacheConfig {
+public class CartCacheConfig implements CachingConfigurer {
 
     /** 장바구니 캐시 TTL. 무효화가 주 수단이고, 이 값은 안전망이다. */
     private static final Duration CART_TTL = Duration.ofMinutes(30);
@@ -58,14 +71,32 @@ public class CartCacheConfig {
         return new LettuceConnectionFactory(new RedisStandaloneConfiguration(redisHost, redisPort));
     }
 
+    /**
+     * 캐시 인프라가 사용할 CacheManager. {@link CachingConfigurer#cacheManager()} 를 오버라이드해야
+     * 이 매니저(TransactionAwareCacheManagerProxy)가 확실히 적용된다. 인자 있는 시그니처는
+     * 인터페이스 메서드를 오버라이드하지 못해 기본 null 콜백으로 동작하므로 인자 없이 선언한다.
+     */
     @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        return RedisCacheManager.builder(connectionFactory)
+    @Override
+    public CacheManager cacheManager() {
+        RedisCacheManager redisCacheManager = RedisCacheManager.builder(redisConnectionFactory())
                 .cacheDefaults(cacheConfiguration(DEFAULT_TTL))
                 .withInitialCacheConfigurations(Map.of(
                         CartCacheNames.CART, cacheConfiguration(CART_TTL)
                 ))
                 .build();
+        // 커밋 이후에 put/evict 되도록 감싼다. (CartService 조회/변경 메서드와
+        // CartOrderService.checkout() 이 같은 캐시를 쓰므로 커밋 전후 stale 노출을 줄인다.)
+        return new TransactionAwareCacheManagerProxy(redisCacheManager);
+    }
+
+    /**
+     * Redis 장애를 흡수한다. 캐시 조회/저장/무효화 중 예외가 나면 로깅만 하고 삼켜,
+     * {@code @Cacheable}/{@code @CacheEvict} 경로가 DB 로 대체 가능한 요청까지 실패하지 않게 한다.
+     */
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new LoggingCacheErrorHandler();
     }
 
     private RedisCacheConfiguration cacheConfiguration(Duration ttl) {
