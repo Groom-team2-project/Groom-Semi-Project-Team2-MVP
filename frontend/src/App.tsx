@@ -824,7 +824,12 @@ export default function App() {
                     type="button"
                     className="my-order-row"
                     key={order.orderId}
-                    onClick={() => navigate(`/orders/${order.orderId}`)}
+                    onClick={() => {
+                      if (order.orderId) {
+                        void loadOrder(String(order.orderId));
+                        navigate(`/orders/${order.orderId}`);
+                      }
+                    }}
                   >
                     <span>#{order.orderId}</span>
                     <strong>{order.status ?? '-'}</strong>
