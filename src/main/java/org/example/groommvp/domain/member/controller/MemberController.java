@@ -89,14 +89,24 @@ public class MemberController {
             @ApiResponse(responseCode = "401", description = "인증이 필요하거나 토큰이 유효하지 않음",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
-                            examples = @ExampleObject(value = """
-                                    {
-                                        "success": false,
-                                        "data": null,
-                                        "errorCode": "UNAUTHORIZED",
-                                        "message": "인증이 필요합니다."
-                                    }
-                                    """))),
+                            examples = {
+                                    @ExampleObject(name = "인증 없음", value = """
+                                {
+                                    "success": false,
+                                    "data": null,
+                                    "errorCode": "UNAUTHORIZED",
+                                    "message": "인증이 필요합니다."
+                                }
+                                """),
+                                    @ExampleObject(name = "유효하지 않은 토큰", value = """
+                                {
+                                    "success": false,
+                                    "data": null,
+                                    "errorCode": "INVALID_TOKEN",
+                                    "message": "유효하지 않은 토큰입니다."
+                                }
+                                """)
+                            })),
             @ApiResponse(responseCode = "403", description = "접근 권한 없음",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
