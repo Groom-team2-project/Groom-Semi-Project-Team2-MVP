@@ -9,6 +9,7 @@ import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.payment.dto.RefundRequest;
 import org.example.groommvp.domain.payment.dto.RefundResponse;
+import org.example.groommvp.domain.payment.event.PaymentCompletedEvent;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
@@ -20,6 +21,7 @@ import org.example.groommvp.domain.payment.entity.Payment;
 import org.example.groommvp.domain.payment.repository.PaymentRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class PaymentService {
 	private final TossPaymentClient tossPaymentClient;
 	private final StockRepository stockRepository;
 	private final StockHistoryRepository stockHistoryRepository;
+	private final ApplicationEventPublisher eventPublisher;
 
 	@Transactional
 	public PaymentResponse pay(Long orderId, PaymentRequest request) {
@@ -77,6 +80,10 @@ public class PaymentService {
 		} catch (DataIntegrityViolationException e) {
 			throw new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS);
 		}
+
+		eventPublisher.publishEvent(
+			new PaymentCompletedEvent(orderId, payment.getId(), payment.getAmount())
+		);
 		return PaymentResponse.from(payment);
 	}
 
