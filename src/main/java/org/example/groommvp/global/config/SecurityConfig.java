@@ -27,6 +27,8 @@ public class SecurityConfig {
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
                                 SecurityErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED))
+                        .accessDeniedHandler(((request, response, accessDeniedException) ->
+                                SecurityErrorResponseWriter.write(response, ErrorCode.FORBIDDEN)))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
