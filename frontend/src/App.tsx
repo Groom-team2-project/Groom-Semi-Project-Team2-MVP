@@ -111,8 +111,17 @@ function writeProductCache(products: Product[]) {
   }));
 }
 
-function readOrderHistory(): OrderDetail[] {
-  const rawHistory = localStorage.getItem(ORDER_HISTORY_KEY);
+function orderHistoryKey(memberId?: number) {
+  return memberId ? `${ORDER_HISTORY_KEY}:${memberId}` : '';
+}
+
+function readOrderHistory(memberId?: number): OrderDetail[] {
+  const key = orderHistoryKey(memberId);
+  if (!key) {
+    return [];
+  }
+
+  const rawHistory = localStorage.getItem(key);
   if (!rawHistory) {
     return [];
   }
@@ -121,18 +130,22 @@ function readOrderHistory(): OrderDetail[] {
     const history = JSON.parse(rawHistory) as OrderDetail[];
     return Array.isArray(history) ? history : [];
   } catch {
-    localStorage.removeItem(ORDER_HISTORY_KEY);
+    localStorage.removeItem(key);
     return [];
   }
 }
 
-function writeOrderHistory(history: OrderDetail[]) {
-  localStorage.setItem(ORDER_HISTORY_KEY, JSON.stringify(history.slice(0, 12)));
+function writeOrderHistory(memberId: number | undefined, history: OrderDetail[]) {
+  const key = orderHistoryKey(memberId);
+  if (!key) {
+    return;
+  }
+
+  localStorage.setItem(key, JSON.stringify(history.slice(0, 12)));
 }
 
 export default function App() {
   const cachedProducts = readProductCache();
-  const cachedOrders = readOrderHistory();
   const [routePath, setRoutePath] = useState(window.location.pathname);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '');
   const [state, setState] = useState(() => localStorage.getItem(STATE_KEY) ?? '');
@@ -153,7 +166,7 @@ export default function App() {
   const [customMethod, setCustomMethod] = useState('GET');
   const [customPath, setCustomPath] = useState('/api/v1/products');
   const [customBody, setCustomBody] = useState('{\n  "quantity": 1\n}');
-  const [orderHistory, setOrderHistory] = useState<OrderDetail[]>(cachedOrders);
+  const [orderHistory, setOrderHistory] = useState<OrderDetail[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState('인기 상품을 둘러보고 바로 구매해보세요.');
   const [isLoading, setIsLoading] = useState(false);
@@ -176,6 +189,10 @@ export default function App() {
     const email = member?.email;
     return nickname || email || 'Member';
   }, [member, token]);
+
+  useEffect(() => {
+    setOrderHistory(readOrderHistory(member?.memberId));
+  }, [member?.memberId]);
 
   useEffect(() => {
     const handlePopState = () => setRoutePath(window.location.pathname);
@@ -234,6 +251,9 @@ export default function App() {
   function clearSession() {
     setToken('');
     setMember(null);
+    setOrderHistory([]);
+    setOrderDetail(null);
+    setOrderId('');
     localStorage.removeItem(TOKEN_KEY);
     setNotice('로그아웃되었습니다.');
   }
@@ -248,7 +268,7 @@ export default function App() {
         order,
         ...prev.filter((item) => item.orderId !== order.orderId)
       ].slice(0, 12);
-      writeOrderHistory(next);
+      writeOrderHistory(member?.memberId, next);
       return next;
     });
   }
@@ -481,7 +501,7 @@ export default function App() {
 
     const result = await run('상품 구매', 'POST', `/api/v1/products/${productId}/orders`, {
       quantity
-    });
+    }, true);
     const data = unwrapData(result);
     const nextOrderId = getNested<number>(data, 'orderId');
     if (nextOrderId) {
@@ -503,7 +523,7 @@ export default function App() {
       return;
     }
 
-    const result = await run<OrderDetail>('주문 조회', 'GET', `/api/v1/orders/${nextOrderId}`);
+    const result = await run<OrderDetail>('주문 조회', 'GET', `/api/v1/orders/${nextOrderId}`, undefined, true);
     const data = unwrapData<OrderDetail>(result);
 
     if (data) {
@@ -553,7 +573,7 @@ export default function App() {
     const result = await run('결제 승인', 'POST', `/api/v1/orders/${orderPk}/payments`, {
       paymentKey,
       method
-    });
+    }, true);
 
     if (result.ok) {
       setOrderId(orderPk);
@@ -570,7 +590,7 @@ export default function App() {
     const pk = orderDetail?.orderId ?? routeOrderId;
     const result = await run('결제 환불', 'POST', `/api/v1/orders/${pk}/payments/refund`, {
       cancelReason: '고객 환불 요청'
-    });
+    }, true);
     if (result.ok) {
       setNotice('환불이 완료되었습니다.');
       void loadOrder(String(pk));
