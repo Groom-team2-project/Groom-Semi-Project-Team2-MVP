@@ -4,10 +4,7 @@ import java.time.Duration;
 
 import org.example.groommvp.domain.auth.config.KakaoOAuthProperties;
 import org.example.groommvp.domain.auth.config.OAuthCookieProperties;
-import org.example.groommvp.domain.auth.dto.KakaoAuthorizeResult;
-import org.example.groommvp.domain.auth.dto.KakaoAuthorizeUrlResponse;
-import org.example.groommvp.domain.auth.dto.KakaoLoginRequest;
-import org.example.groommvp.domain.auth.dto.LoginResponse;
+import org.example.groommvp.domain.auth.dto.*;
 import org.example.groommvp.domain.auth.service.AuthService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpHeaders;
@@ -90,6 +87,37 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, expiredCookie.toString())
                 .body(CommonResponse.success(response, "Kakao login succeeded"));
     }
+
+    @Operation(
+            summary = "JWT 토큰 재발급",
+            description = "Refresh Token으로 Access Token과 Refresh Token을 재발급합니다."
+    )
+    @PostMapping("/reissue")
+    public ResponseEntity<CommonResponse<TokenReissueResponse>> reissue(
+            @Valid @RequestBody TokenReissueRequest request
+    ) {
+        TokenReissueResponse response = authService.reissue(request.refreshToken());
+
+        return ResponseEntity.ok(
+                CommonResponse.success(response, "토큰 재발급 성공")
+        );
+    }
+
+    @Operation(
+            summary = "로그아웃",
+            description = "Refresh Token을 무효화하여 재발급을 막습니다. 카카오 계정 로그아웃은 수행하지 않습니다."
+    )
+    @PostMapping("/logout")
+    public ResponseEntity<CommonResponse<Void>> logout(
+            @Valid @RequestBody LogoutRequest request
+    ) {
+        authService.logout(request.refreshToken());
+
+        return ResponseEntity.ok(
+                CommonResponse.success(null, "로그아웃 성공")
+        );
+    }
+
 
     private ResponseCookie createOAuthNonceCookie(String value, Duration maxAge) {
         return ResponseCookie.from("oauth_nonce", value)

@@ -3,12 +3,16 @@ package org.example.groommvp.domain.product.entity;
 import java.time.LocalDateTime;
 
 import org.example.groommvp.global.entity.BaseEntity;
+import org.example.groommvp.domain.category.entity.CategoryEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -32,6 +36,10 @@ public class ProductEntity extends BaseEntity {
     @Column(name = "product_price", nullable = false)
     private Integer productPrice;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private CategoryEntity category;
+
     /** 삭제된 시간 */
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -39,10 +47,12 @@ public class ProductEntity extends BaseEntity {
     @Builder
     public ProductEntity(
             String productName,
-            Integer productPrice
+            Integer productPrice,
+            CategoryEntity category
     ) {
         this.productName = productName;
         this.productPrice = productPrice;
+        this.category = category;
     }
 
     public void update(

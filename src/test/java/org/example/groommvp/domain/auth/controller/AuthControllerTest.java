@@ -12,6 +12,7 @@ import org.example.groommvp.domain.auth.config.KakaoOAuthProperties;
 import org.example.groommvp.domain.auth.config.OAuthCookieProperties;
 import org.example.groommvp.domain.auth.dto.KakaoAuthorizeResult;
 import org.example.groommvp.domain.auth.dto.LoginResponse;
+import org.example.groommvp.domain.auth.dto.TokenReissueResponse;
 import org.example.groommvp.domain.auth.service.AuthService;
 import org.example.groommvp.domain.member.entity.MemberRole;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +67,16 @@ class AuthControllerTest {
                 "http://localhost:8080/api/v1/auth/kakao/callback",
                 "state",
                 "nonce"
-        )).thenReturn(new LoginResponse("Bearer", "access-token", 7200L, 1L, MemberRole.USER, false));
+        )).thenReturn(new LoginResponse(
+                "Bearer",
+                "access-token",
+                7200L,
+                "refresh-token",
+                1209600L,
+                1L,
+                MemberRole.USER,
+                false
+        ));
 
         mockMvc.perform(post("/api/v1/auth/kakao/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -81,7 +91,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(cookie().maxAge("oauth_nonce", 0))
                 .andExpect(cookie().secure("oauth_nonce", true))
-                .andExpect(jsonPath("$.data.accessToken").value("access-token"));
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh-token"));
 
         verify(authService).loginWithKakao(
                 "code",
@@ -98,7 +109,16 @@ class AuthControllerTest {
                 "http://localhost:8080/api/v1/auth/kakao/callback",
                 "state",
                 "nonce"
-        )).thenReturn(new LoginResponse("Bearer", "access-token", 7200L, 1L, MemberRole.USER, false));
+        )).thenReturn(new LoginResponse(
+                "Bearer",
+                "access-token",
+                7200L,
+                "refresh-token",
+                1209600L,
+                1L,
+                MemberRole.USER,
+                false
+        ));
 
         mockMvc.perform(get("/api/v1/auth/kakao/callback")
                         .param("code", "code")
@@ -107,7 +127,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(cookie().maxAge("oauth_nonce", 0))
                 .andExpect(cookie().secure("oauth_nonce", true))
-                .andExpect(jsonPath("$.data.accessToken").value("access-token"));
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh-token"));
 
         verify(authService).loginWithKakao(
                 "code",
@@ -115,5 +136,47 @@ class AuthControllerTest {
                 "state",
                 "nonce"
         );
+    }
+
+    @Test
+    void reissueReturnsNewAccessTokenAndRefreshToken() throws Exception {
+        when(authService.reissue("old-refresh-token"))
+                .thenReturn(new TokenReissueResponse(
+                        "Bearer",
+                        "new-access-token",
+                        7200L,
+                        "new-refresh-token",
+                        1209600L
+                ));
+
+        mockMvc.perform(post("/api/v1/auth/reissue")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "old-refresh-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.data.refreshToken").value("new-refresh-token"));
+
+        verify(authService).reissue("old-refresh-token");
+    }
+
+    @Test
+    void logoutRevokesRefreshToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "refresh-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("로그아웃 성공"));
+
+        verify(authService).logout("refresh-token");
     }
 }
