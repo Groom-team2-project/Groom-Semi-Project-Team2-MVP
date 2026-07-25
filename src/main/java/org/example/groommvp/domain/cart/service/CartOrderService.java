@@ -76,8 +76,8 @@ public class CartOrderService {
             lines.add(new Line(stock, product, quantity, orderPrice));
         }
 
-        // 2) 단일 주문 생성 후 주문 항목/재고 이력 적재
-        Order order = orderRepository.save(Order.pendingPayment(totalPrice));
+        // 2) 단일 주문 생성 후 주문 항목/재고 이력 적재 (주문자 = 장바구니 소유 회원)
+        Order order = orderRepository.save(Order.pendingPayment(memberId, totalPrice));
         List<CartCheckoutResponse.OrderedItem> orderedItems = new ArrayList<>();
         for (Line line : lines) {
             orderItemRepository.save(
