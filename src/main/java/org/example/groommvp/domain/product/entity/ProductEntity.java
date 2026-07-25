@@ -36,6 +36,9 @@ public class ProductEntity extends BaseEntity {
     @Column(name = "product_price", nullable = false)
     private Integer productPrice;
 
+    @Column(name = "product_image", nullable = false)
+    private String productImage;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private CategoryEntity category;
@@ -48,20 +51,25 @@ public class ProductEntity extends BaseEntity {
     public ProductEntity(
             String productName,
             Integer productPrice,
+            String productImage,
             CategoryEntity category
     ) {
         this.productName = productName;
         this.productPrice = productPrice;
+        this.productImage = productImage;
         this.category = category;
     }
 
     public void update(
             String productName,
-            Integer productPrice
+            Integer productPrice,
+            String productImage,
+            CategoryEntity category
     ) {
         this.productName = productName;
         this.productPrice = productPrice;
-
+        this.productImage = productImage;
+        this.category = category;
     }
 
     /** 삭제 처리 */

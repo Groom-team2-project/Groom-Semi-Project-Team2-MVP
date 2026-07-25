@@ -1,9 +1,6 @@
 package org.example.groommvp.domain.product.service;
 
-import org.example.groommvp.domain.product.dto.ProductCreateRequest;
-import org.example.groommvp.domain.product.dto.ProductListResponse;
-import org.example.groommvp.domain.product.dto.ProductResponse;
-import org.example.groommvp.domain.product.dto.ProductUpdateRequest;
+import org.example.groommvp.domain.product.dto.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -19,7 +16,7 @@ public interface ProductService {
     ProductResponse deleteProduct(Long productId);
 
     //상품 단건 조회
-    ProductResponse getProduct(Long productId);
+    ProductDetailResponse getProduct(Long productId);
 
     Page<ProductListResponse> getProductList(String keyword, Pageable pageable);
 }

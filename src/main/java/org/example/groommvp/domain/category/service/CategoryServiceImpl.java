@@ -15,7 +15,7 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class CategoryServiceImp implements CategoryService{
+public class CategoryServiceImpl implements CategoryService{
 
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
@@ -25,13 +25,13 @@ public class CategoryServiceImp implements CategoryService{
     @Transactional
     public CategoryResponse createLargeCategory(CategoryCreateRequest request) {
         //카테고리명 중복 확인
-        String categoryName = request.getCategoryName().trim();
+        String categoryName = request.getCategoryName();
         if (categoryRepository.existsByCategoryName(categoryName)) {
             throw new BusinessException(ErrorCode.CATEGORY_NAME_DUPLICATED);
         }
 
         CategoryEntity category = CategoryEntity.builder()
-                .categoryName(request.getCategoryName().trim())
+                .categoryName(request.getCategoryName())
                 .parentCategory(null)
                 .build();
         CategoryEntity savedCategory = categoryRepository.save(category);
@@ -43,13 +43,9 @@ public class CategoryServiceImp implements CategoryService{
     @Transactional
     public CategoryResponse createMiddleCategory(Long parentId, CategoryCreateRequest request) {
         //카테고리명 중복 확인
-        String categoryName = request.getCategoryName().trim();
+        String categoryName = request.getCategoryName();
         if (categoryRepository.existsByCategoryName(categoryName)) {
             throw new BusinessException(ErrorCode.CATEGORY_NAME_DUPLICATED);
-        }
-        //상위 카테고리 인자값 없을 때
-        if (parentId == null) {
-            throw new BusinessException(ErrorCode.PARENT_CATEGORY_MISSING);
         }
         //상위 카테고리 찾을 수 없을 때
         CategoryEntity parent = categoryRepository.findById(parentId)
@@ -70,7 +66,7 @@ public class CategoryServiceImp implements CategoryService{
     @Override
     @Transactional
     public CategoryResponse updateCategory(Long categoryId, CategoryUpdateRequest request) {
-        String categoryName = request.getCategoryName().trim();
+        String categoryName = request.getCategoryName();
         //카테고리 찾을 수 없을 때
         CategoryEntity category = categoryRepository.findById(categoryId)
                 .orElseThrow(()->new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
