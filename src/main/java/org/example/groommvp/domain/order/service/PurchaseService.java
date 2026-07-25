@@ -31,7 +31,11 @@ public class PurchaseService {
     private final OrderItemRepository orderItemRepository;
 
     @Transactional
-    public PurchaseResponse purchase(Long productId, PurchaseRequest request) {
+    public PurchaseResponse purchase(Long productId, Long memberId, PurchaseRequest request) {
+        if (memberId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+
         if (!productRepository.existsById(productId)) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
@@ -45,12 +49,13 @@ public class PurchaseService {
 
         int orderPrice = product.getProductPrice();
         long totalPrice = (long) orderPrice * quantity;
-        Order order = orderRepository.save(Order.pendingPayment(totalPrice));
+        Order order = orderRepository.save(Order.pendingPayment(memberId, totalPrice));
         orderItemRepository.save(new OrderItem(order, product, quantity, orderPrice));
         stockHistoryRepository.save(StockHistoryEntity.reserve(stock, order.getId(), quantity, PURCHASE_REASON));
 
         return new PurchaseResponse(
                 order.getId(),
+                order.getMemberId(),
                 product.getProductId(),
                 quantity,
                 stock.getAvailableStocks(),
