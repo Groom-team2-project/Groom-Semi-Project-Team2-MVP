@@ -3,6 +3,8 @@ package org.example.groommvp.domain.coupon.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.coupon.dto.CouponCreateRequest;
+import org.example.groommvp.domain.coupon.dto.CouponResponse;
 import org.example.groommvp.domain.coupon.dto.MemberCouponResponse;
 import org.example.groommvp.domain.coupon.entity.CouponEntity;
 import org.example.groommvp.domain.coupon.entity.MemberCouponEntity;
@@ -13,6 +15,7 @@ import org.example.groommvp.domain.member.repository.MemberRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +37,22 @@ public class CouponService {
     private final MemberRepository memberRepository;
 
     /**
+     * 쿠폰(정책)을 생성한다. (어드민)
+     *
+     * <p>발급 종료가 시작보다 빠르면 발급 자체가 불가능하므로 기간 정합성을 검증한다.
+     *
+     * @throws BusinessException 발급 시작이 종료보다 늦은 경우
+     */
+    @Transactional
+    public CouponResponse createCoupon(CouponCreateRequest request) {
+        if (!request.issueStartAt().isBefore(request.issueEndAt())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        CouponEntity coupon = couponRepository.save(request.toEntity());
+        return CouponResponse.from(coupon);
+    }
+
+    /**
      * 쿠폰을 발급한다. (선착순)
      *
      * @throws BusinessException 쿠폰이 없거나, 발급 기간이 아니거나, 소진됐거나, 이미 발급받은 경우
@@ -48,8 +67,7 @@ public class CouponService {
 
         MemberEntity member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-        CouponEntity coupon = couponRepository.findByIdWithPessimisticLock(couponId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.COUPON_NOT_FOUND));
+        CouponEntity coupon = findCouponForIssue(couponId);
 
         // 발급 기간·잔여 수량 검증을 포함해 수량을 증가시킨다. (락 구간 안에서 수행)
         coupon.issue(now);
@@ -61,6 +79,22 @@ public class CouponService {
         } catch (DataIntegrityViolationException e) {
             // 위 존재 검사를 동시에 통과한 요청이 있는 경우 — 유니크 제약이 최종 방어선.
             throw new BusinessException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+    }
+
+    /**
+     * 발급용으로 쿠폰 행에 비관적 락을 걸어 조회한다.
+     *
+     * <p>인기 쿠폰에 요청이 몰려 락 획득이 타임아웃되면 스레드를 오래 붙잡는 대신
+     * {@link ErrorCode#COUPON_ISSUE_BUSY} 로 변환해 클라이언트가 재시도하도록 유도한다.
+     * (타임아웃 값은 {@code CouponRepository} 의 {@code @QueryHints} 참고.)
+     */
+    private CouponEntity findCouponForIssue(Long couponId) {
+        try {
+            return couponRepository.findByIdWithPessimisticLock(couponId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.COUPON_NOT_FOUND));
+        } catch (PessimisticLockingFailureException e) {
+            throw new BusinessException(ErrorCode.COUPON_ISSUE_BUSY);
         }
     }
 
