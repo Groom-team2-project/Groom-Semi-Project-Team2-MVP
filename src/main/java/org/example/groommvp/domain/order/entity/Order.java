@@ -29,6 +29,9 @@ public class Order extends BaseEntity {
     @Column(name = "order_id")
     private Long id;
 
+    @Column(name = "member_id")
+    private Long memberId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private OrderStatus status;
@@ -40,10 +43,14 @@ public class Order extends BaseEntity {
     private LocalDateTime canceledAt;
 
     public Order(Long totalPrice) {
-        this(totalPrice, OrderStatus.COMPLETED);
+        this(null, totalPrice, OrderStatus.COMPLETED);
     }
 
-    private Order(Long totalPrice, OrderStatus status) {
+    public Order(Long memberId, Long totalPrice) {
+        this(memberId, totalPrice, OrderStatus.COMPLETED);
+    }
+
+    private Order(Long memberId, Long totalPrice, OrderStatus status) {
         if (totalPrice == null) {
             throw new IllegalArgumentException("주문 금액은 필수입니다.");
         }
@@ -51,12 +58,17 @@ public class Order extends BaseEntity {
         if (totalPrice < 0) {
             throw new IllegalArgumentException("주문 금액은 0 이상이어야 합니다.");
         }
+        this.memberId = memberId;
         this.totalPrice = totalPrice;
         this.status = status;
     }
 
     public static Order pendingPayment(Long totalPrice) {
-        return new Order(totalPrice, OrderStatus.PENDING_PAYMENT);
+        return pendingPayment(null, totalPrice);
+    }
+
+    public static Order pendingPayment(Long memberId, Long totalPrice) {
+        return new Order(memberId, totalPrice, OrderStatus.PENDING_PAYMENT);
     }
 
     public void completePayment() {

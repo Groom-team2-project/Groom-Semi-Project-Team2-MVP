@@ -1,8 +1,10 @@
 package org.example.groommvp.domain.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.example.groommvp.domain.order.dto.PurchaseRequest;
+import org.example.groommvp.domain.order.dto.PurchaseResponse;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
@@ -11,6 +13,7 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
+import org.example.groommvp.global.error.ErrorCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +57,34 @@ public class PurchaseServiceConcurrencyTest {
     }
 
     @Test
+    @DisplayName("로그인 회원 주문은 주문자 회원 ID를 저장한다")
+    void purchaseWithMemberIdStoresOrderOwner() {
+        ProductEntity product = productRepository.save(
+                new ProductEntity("Member Product", 10000)
+        );
+        stockRepository.save(new StockEntity(product, 10));
+
+        Long memberId = 1L;
+
+        PurchaseResponse response = purchaseService.purchase(
+                product.getProductId(),
+                memberId,
+                new PurchaseRequest(2)
+        );
+
+        assertThat(orderRepository.findAll().getFirst().getMemberId()).isEqualTo(memberId);
+        assertThat(response.memberId()).isEqualTo(memberId);
+    }
+
+    @Test
+    @DisplayName("주문 생성 시 주문자 회원 ID는 필수다")
+    void purchaseWithoutMemberIdThrowsUnauthorized() {
+        assertThatThrownBy(() -> purchaseService.purchase(1L, null, new PurchaseRequest(1)))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UNAUTHORIZED);
+    }
+
+    @Test
     @DisplayName("상품은 총 N개 있다고 할 때, N명의 사용자가 1번씩 동시에 주문할 경우 정확하게 N개의 주문만 생성된다")
     void concurrentPurchaseReservesStockExactly() throws InterruptedException {
         ProductEntity product = productRepository.save(
@@ -70,6 +101,7 @@ public class PurchaseServiceConcurrencyTest {
         AtomicInteger successCount = new AtomicInteger();
 
         for (int i = 0; i < threadCount; i++) {
+            long memberId = i + 1L;
             executorService.submit(() -> {
                 readyLatch.countDown();
 
@@ -78,6 +110,7 @@ public class PurchaseServiceConcurrencyTest {
 
                     purchaseService.purchase(
                             product.getProductId(),
+                            memberId,
                             new PurchaseRequest(1)
                     );
 
@@ -127,6 +160,7 @@ public class PurchaseServiceConcurrencyTest {
         AtomicInteger failCount = new AtomicInteger();
 
         for (int i = 0; i < threadCount; i++) {
+            long memberId = i + 1L;
             executorService.submit(() -> {
                 readyLatch.countDown();
 
@@ -135,6 +169,7 @@ public class PurchaseServiceConcurrencyTest {
 
                     purchaseService.purchase(
                             product.getProductId(),
+                            memberId,
                             new PurchaseRequest(1)
                     );
 
