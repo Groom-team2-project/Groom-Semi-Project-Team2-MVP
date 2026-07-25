@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.util.List;
 import java.util.Optional;
 import org.example.groommvp.domain.member.entity.MemberEntity;
 import org.example.groommvp.domain.member.repository.MemberRepository;
@@ -109,30 +110,54 @@ class PointServiceTest {
     }
 
     @Test
-    @DisplayName("사용 취소하면 잔액이 복구되고 CANCEL 이력이 남는다")
-    void cancelUse_restoresBalance() {
+    @DisplayName("사용 취소하면 원 USE 사용액만큼 잔액이 복구되고 CANCEL 이력이 남는다")
+    void cancelUse_restoresUsedAmount() {
         PointBalanceEntity balance = balanceWith(200);
         given(pointBalanceRepository.findByMemberIdWithPessimisticLock(MEMBER_ID))
                 .willReturn(Optional.of(balance));
+        given(pointHistoryRepository.existsByMember_MemberIdAndOrderIdAndType(MEMBER_ID, 42L, PointHistoryType.CANCEL))
+                .willReturn(false);
+        // 그 주문에서 실제 사용한 포인트는 300 (호출자가 주는 금액이 아니라 이력에서 도출)
+        given(pointHistoryRepository.findByMember_MemberIdAndOrderIdAndType(MEMBER_ID, 42L, PointHistoryType.USE))
+                .willReturn(List.of(PointHistoryEntity.of(member(), PointHistoryType.USE, 300, 0, 42L)));
 
-        long result = pointService.cancelUse(MEMBER_ID, 300, 42L);
+        long result = pointService.cancelUse(MEMBER_ID, 42L);
 
         assertThat(result).isEqualTo(500);
         ArgumentCaptor<PointHistoryEntity> captor = ArgumentCaptor.forClass(PointHistoryEntity.class);
         verify(pointHistoryRepository).save(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo(PointHistoryType.CANCEL);
+        assertThat(captor.getValue().getAmount()).isEqualTo(300);
+    }
+
+    @Test
+    @DisplayName("이미 취소된 주문이면 멱등 처리되어 잔액이 그대로다 (취소 이벤트 재전송)")
+    void cancelUse_idempotentWhenAlreadyCanceled() {
+        PointBalanceEntity balance = balanceWith(200);
+        given(pointBalanceRepository.findByMemberIdWithPessimisticLock(MEMBER_ID))
+                .willReturn(Optional.of(balance));
+        given(pointHistoryRepository.existsByMember_MemberIdAndOrderIdAndType(MEMBER_ID, 42L, PointHistoryType.CANCEL))
+                .willReturn(true);
+
+        long result = pointService.cancelUse(MEMBER_ID, 42L);
+
+        assertThat(result).isEqualTo(200);
+        verify(pointHistoryRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("잔액 레코드가 없으면 회원을 찾아 새로 만든 뒤 적립한다")
     void earn_createsBalanceWhenAbsent() {
+        // 최초 조회·회원 락 후 재확인 모두 없음 → 생성 경로. (회원 행을 잠가 직렬화)
         given(pointBalanceRepository.findByMemberIdWithPessimisticLock(MEMBER_ID))
                 .willReturn(Optional.empty())
-                .willReturn(Optional.of(balanceWith(0)));
-        given(memberRepository.findById(MEMBER_ID)).willReturn(Optional.of(member()));
+                .willReturn(Optional.empty());
+        given(memberRepository.findByIdWithPessimisticLock(MEMBER_ID)).willReturn(Optional.of(member()));
+        given(pointBalanceRepository.save(any(PointBalanceEntity.class))).willReturn(balanceWith(0));
 
         pointService.earn(MEMBER_ID, 500, null);
 
+        verify(memberRepository).findByIdWithPessimisticLock(MEMBER_ID);
         verify(pointBalanceRepository).save(any(PointBalanceEntity.class));
     }
 

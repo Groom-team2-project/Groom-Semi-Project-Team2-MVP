@@ -71,9 +71,15 @@ public class CartCacheConfig implements CachingConfigurer {
         return new LettuceConnectionFactory(new RedisStandaloneConfiguration(redisHost, redisPort));
     }
 
+    /**
+     * 캐시 인프라가 사용할 CacheManager. {@link CachingConfigurer#cacheManager()} 를 오버라이드해야
+     * 이 매니저(TransactionAwareCacheManagerProxy)가 확실히 적용된다. 인자 있는 시그니처는
+     * 인터페이스 메서드를 오버라이드하지 못해 기본 null 콜백으로 동작하므로 인자 없이 선언한다.
+     */
     @Bean
-    public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        RedisCacheManager redisCacheManager = RedisCacheManager.builder(connectionFactory)
+    @Override
+    public CacheManager cacheManager() {
+        RedisCacheManager redisCacheManager = RedisCacheManager.builder(redisConnectionFactory())
                 .cacheDefaults(cacheConfiguration(DEFAULT_TTL))
                 .withInitialCacheConfigurations(Map.of(
                         CartCacheNames.CART, cacheConfiguration(CART_TTL)

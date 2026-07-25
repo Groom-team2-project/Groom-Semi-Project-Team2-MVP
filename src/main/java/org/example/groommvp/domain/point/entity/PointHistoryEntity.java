@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,10 +26,22 @@ import org.example.groommvp.global.entity.BaseEntity;
  * 어떤 주문 때문에, 변동 후 잔액이 얼마인지"를 추적한다.
  *
  * <p><b>네이밍 컨벤션:</b> 자바 필드는 camelCase, DB 컬럼은 snake_case. (팀 컨벤션)
+ *
+ * <p><b>멱등성 제약:</b> {@code (member_id, order_id, type)} 유니크 제약으로, 같은 주문에 대한
+ * 같은 타입 변동이 두 번 적재되지 않게 한다. 특히 주문 취소(CANCEL) 이벤트가 재전송돼도
+ * 복구가 한 번만 반영되도록 하는 최종 방어선이다. (order_id 가 null 인 행은 제약 대상이 아니다)
  */
 @Entity
 @Getter
-@Table(name = "point_histories")
+@Table(
+        name = "point_histories",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "UK_POINT_HISTORIES_MEMBER_ORDER_TYPE",
+                        columnNames = {"member_id", "order_id", "type"}
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PointHistoryEntity extends BaseEntity {
 
