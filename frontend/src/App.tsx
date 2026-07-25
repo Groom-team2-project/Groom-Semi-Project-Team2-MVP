@@ -704,7 +704,7 @@ export default function App() {
     }, true);
     if (result.ok) {
       setNotice('환불이 완료되었습니다.');
-      void loadOrder(String(pk));
+      void loadOrder(String(pk), { remember: true, ownerMemberId: currentMemberId });
     }
   }
 
