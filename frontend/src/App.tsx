@@ -138,6 +138,21 @@ function decodeJwtMemberId(token: string): number | undefined {
 }
 
 // ============================================================================
+// TODO [DEV-ONLY · 배포 전 삭제]: 아래 base64UrlFromBytes / genDevToken 및 관련
+// 상태(devMemberId/devRole/devSecret)와 UI(🔧 테스트용 토큰 발급 카드)는 카카오
+// 로그인 없이 로컬 테스트용 JWT 를 만드는 코드입니다. 운영 배포 전 반드시 제거하세요.
+// (JWT_SECRET 만 알면 임의 회원/권한 토큰을 위조할 수 있으므로 운영에 남으면 보안 취약점)
+// 검색 태그: DEV-ONLY
+// ============================================================================
+// 테스트용: 바이트 배열을 base64url(no padding) 로 인코딩. dev JWT 서명에 사용.
+function base64UrlFromBytes(bytes: Uint8Array): string {
+  let binary = '';
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function createLogId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -243,6 +258,10 @@ export default function App() {
     '  "validDays": 30\n' +
     '}'
   );
+  // DEV-ONLY [배포 전 삭제]: 테스트용 dev 토큰 생성 입력값 (카카오 없이 로컬 인증)
+  const [devMemberId, setDevMemberId] = useState('1');
+  const [devRole, setDevRole] = useState('ADMIN');
+  const [devSecret, setDevSecret] = useState('local-dev-jwt-secret-key-change-before-deploy');
   const [mEmail, setMEmail] = useState('');
   const [mNick, setMNick] = useState('');
   const [cart, setCart] = useState<CartView | null>(null);
@@ -813,6 +832,38 @@ export default function App() {
     }
   }
 
+  // ===== DEV-ONLY [배포 전 삭제]: dev JWT 생성 (카카오 없이, HS256, 로컬 테스트 전용) =====
+  async function genDevToken() {
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const header = { alg: 'HS256', typ: 'JWT' };
+      const payload = {
+        sub: String(devMemberId || '1'),
+        role: devRole,
+        provider: 'KAKAO',
+        iat: now,
+        exp: now + 7200
+      };
+      const encoder = new TextEncoder();
+      const encodePart = (value: unknown) => base64UrlFromBytes(encoder.encode(JSON.stringify(value)));
+      const signingInput = `${encodePart(header)}.${encodePart(payload)}`;
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(devSecret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(signingInput));
+      const jwt = `${signingInput}.${base64UrlFromBytes(new Uint8Array(signature))}`;
+      saveToken(jwt);
+      setNotice(`dev 토큰 생성됨 · memberId=${payload.sub} · ${devRole} (앱 JWT_SECRET 과 secret 이 같아야 통과)`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setNotice(`dev 토큰 생성 실패: ${message}`);
+    }
+  }
+
   if (isAdmin && !isAdminUser) {
     return (
       <main className="admin-shell">
@@ -837,6 +888,34 @@ export default function App() {
           </div>
         </section>
 
+        {/* DEV-ONLY [배포 전 삭제]: 접근거부 화면의 테스트용 토큰 발급 카드 */}
+        <section className="admin-grid">
+          <article className="admin-card span-2">
+            <div className="card-heading">
+              <div>
+                <p className="eyebrow">Dev</p>
+                <h2>🔧 테스트용 토큰 발급</h2>
+              </div>
+            </div>
+            <div className="admin-form">
+              <p className="hint">카카오 로그인 없이 로컬 테스트용 토큰을 만듭니다. admin 콘솔을 보려면 role 을 ADMIN 으로 발급하세요.</p>
+              <div className="two-col">
+                <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
+                <label>role
+                  <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
+                    <option>USER</option>
+                    <option>ADMIN</option>
+                  </select>
+                </label>
+              </div>
+              <label>secret (앱 JWT_SECRET 과 동일해야 함)<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
+              <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성 후 입장</button>
+              {token && (
+                <p className="hint">현재 토큰 권한: {currentRole ?? '알 수 없음'} — ADMIN 으로 생성하면 이 화면이 admin 콘솔로 바뀝니다.</p>
+              )}
+            </div>
+          </article>
+        </section>
       </main>
     );
   }
@@ -937,6 +1016,19 @@ export default function App() {
               <label>state<input value={state} onChange={(event) => setState(event.target.value)} /></label>
               <button type="button" onClick={() => completeKakaoLogin()} disabled={!code || !state || isLoading}>JWT 발급</button>
               <label>JWT<textarea value={token} onChange={(event) => saveToken(event.target.value.trim())} rows={4} /></label>
+              {/* DEV-ONLY [배포 전 삭제]: 아래 dev 토큰 생성 UI 는 로컬 테스트 전용 */}
+              <p className="hint">🔧 테스트용 dev 토큰 (카카오 없이 발급)</p>
+              <div className="two-col">
+                <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
+                <label>role
+                  <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
+                    <option>USER</option>
+                    <option>ADMIN</option>
+                  </select>
+                </label>
+              </div>
+              <label>secret (앱 JWT_SECRET 과 동일해야 함)<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
+              <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성</button>
             </div>
           </article>
 
@@ -1319,16 +1411,27 @@ export default function App() {
 
         <section className="admin-grid">
           {!token ? (
+            /* DEV-ONLY [배포 전 삭제]: 마이페이지의 테스트용 토큰 발급 카드 */
             <article className="admin-card span-2">
               <div className="card-heading">
                 <div>
-                  <p className="eyebrow">Login</p>
-                  <h2>로그인이 필요합니다</h2>
+                  <p className="eyebrow">Dev</p>
+                  <h2>🔧 테스트용 토큰 발급</h2>
                 </div>
               </div>
               <div className="admin-form">
-                <p className="hint">마이페이지에서 장바구니, 쿠폰, 포인트 정보를 확인하려면 카카오 로그인이 필요합니다.</p>
-                <button type="button" className="primary" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
+                <p className="hint">카카오 없이 로컬 테스트용 토큰을 만듭니다. 일반 사용자 화면은 role 을 USER 로 발급하세요.</p>
+                <div className="two-col">
+                  <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
+                  <label>role
+                    <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
+                      <option>USER</option>
+                      <option>ADMIN</option>
+                    </select>
+                  </label>
+                </div>
+                <label>secret<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
+                <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성</button>
               </div>
             </article>
           ) : (
