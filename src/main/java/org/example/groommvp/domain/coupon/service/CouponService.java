@@ -3,6 +3,8 @@ package org.example.groommvp.domain.coupon.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.coupon.dto.CouponCreateRequest;
+import org.example.groommvp.domain.coupon.dto.CouponResponse;
 import org.example.groommvp.domain.coupon.dto.MemberCouponResponse;
 import org.example.groommvp.domain.coupon.entity.CouponEntity;
 import org.example.groommvp.domain.coupon.entity.MemberCouponEntity;
@@ -33,6 +35,22 @@ public class CouponService {
     private final CouponRepository couponRepository;
     private final MemberCouponRepository memberCouponRepository;
     private final MemberRepository memberRepository;
+
+    /**
+     * 쿠폰(정책)을 생성한다. (어드민)
+     *
+     * <p>발급 종료가 시작보다 빠르면 발급 자체가 불가능하므로 기간 정합성을 검증한다.
+     *
+     * @throws BusinessException 발급 시작이 종료보다 늦은 경우
+     */
+    @Transactional
+    public CouponResponse createCoupon(CouponCreateRequest request) {
+        if (!request.issueStartAt().isBefore(request.issueEndAt())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        CouponEntity coupon = couponRepository.save(request.toEntity());
+        return CouponResponse.from(coupon);
+    }
 
     /**
      * 쿠폰을 발급한다. (선착순)

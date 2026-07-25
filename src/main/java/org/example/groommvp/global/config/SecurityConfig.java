@@ -41,6 +41,8 @@ public class SecurityConfig {
                                 "api/v1/products/{productId}/orders"
                                 */
                         ).authenticated()
+                        // 쿠폰 등록 등 쿠폰 관리 API는 ADMIN 전용
+                        .requestMatchers("/api/v1/admin/coupons/**").hasRole("ADMIN")
                         // 이하는 ADMIN 역할이 필요한 API들이며, 개발 완료시 주석 해제하여 사용할 것.
                         /*
                         .requestMatchers(
