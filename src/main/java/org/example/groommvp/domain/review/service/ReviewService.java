@@ -22,6 +22,12 @@ public class ReviewService {
 
     @Transactional
     public ReviewResponse createReview(ReviewRequest reviewRequest, Long loginMemberId) {
+        Long productId = reviewRequest.getProductId();
+
+        // 해당 회원이 이 상품을 결제 완료했는지 확인
+        //validateCompletedPayment(loginMemberId, productId);
+
+        // 삭제되지 않은 기존 리뷰가 있는지 확인
         boolean alreadyExists =
                 reviewRepository.existsByProductIdAndMemberIdAndDeletedAtIsNull(
                         reviewRequest.getProductId(),
@@ -87,5 +93,4 @@ public class ReviewService {
             throw new BusinessException(ErrorCode.REVIEW_FORBIDDEN);
         }
     }
-
 }

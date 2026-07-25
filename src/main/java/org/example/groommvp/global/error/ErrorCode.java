@@ -25,6 +25,7 @@ public enum ErrorCode {
     OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
 
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
+    ORDER_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원의 주문에 접근할 수 없습니다."),
     ORDER_ALREADY_CANCELED(HttpStatus.CONFLICT, "이미 취소된 주문입니다."),
     ORDER_NOT_CANCELABLE(HttpStatus.CONFLICT, "취소할 수 없는 주문 상태입니다."),
 
@@ -37,8 +38,12 @@ public enum ErrorCode {
 
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰을 찾을 수 없습니다."),
     COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "이미 발급받은 쿠폰입니다."),
+    COUPON_ISSUE_BUSY(HttpStatus.CONFLICT, "쿠폰 발급 요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
     COUPON_SOLD_OUT(HttpStatus.CONFLICT, "쿠폰이 모두 소진되었습니다."),
     COUPON_NOT_ISSUABLE(HttpStatus.BAD_REQUEST, "발급 가능한 기간이 아닙니다."),
+    POINT_NOT_ENOUGH(HttpStatus.CONFLICT, "보유 포인트가 부족합니다."),
+    INVALID_POINT_AMOUNT(HttpStatus.BAD_REQUEST, "포인트 금액은 1 이상이어야 합니다."),
+
     MEMBER_COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "보유한 쿠폰을 찾을 수 없습니다."),
     MEMBER_COUPON_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원의 쿠폰에 접근할 수 없습니다."),
     COUPON_ALREADY_USED(HttpStatus.CONFLICT, "이미 사용한 쿠폰입니다."),

@@ -47,6 +47,10 @@ public class ProductEntity extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    public ProductEntity(String productName, Integer productPrice) {
+        this(productName, productPrice, null);
+    }
+
     @Builder
     public ProductEntity(
             String productName,

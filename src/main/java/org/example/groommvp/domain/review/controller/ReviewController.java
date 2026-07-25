@@ -2,9 +2,11 @@ package org.example.groommvp.domain.review.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.auth.security.AuthMember;
 import org.example.groommvp.domain.review.dto.ReviewRequest;
 import org.example.groommvp.domain.review.dto.ReviewResponse;
 import org.example.groommvp.domain.review.dto.ReviewUpdateRequest;
@@ -12,6 +14,7 @@ import org.example.groommvp.domain.review.service.ReviewService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,23 +22,22 @@ import java.util.List;
 @Tag(name = "Review", description = "상품 리뷰 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/")
+@RequestMapping("/api/v1")
 public class ReviewController {
     private final ReviewService reviewService;
 
     @Operation(
             summary = "리뷰 등록",
-            description = "상품 리뷰를 등록합니다."
+            description = "상품 리뷰를 등록합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     @PostMapping("/reviews")
     public ResponseEntity<CommonResponse<ReviewResponse>> createReview(
-            //@AuthenticationPrincipal AuthMember authMember,  auth 연결후 주석 제거 예정
-            @RequestParam(name = "memberId") Long memberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @Valid @RequestBody ReviewRequest request
     ) {
         ReviewResponse response =
-                //reviewService.createReview(request, authMember.memberId());
-                reviewService.createReview(request, memberId);
+                reviewService.createReview(request, authMember.memberId());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "리뷰 등록 성공"));
@@ -77,19 +79,19 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 수정",
-            description = "본인이 작성한 리뷰의 내용과 평점을 수정합니다."
+            description = "본인이 작성한 리뷰의 내용과 평점을 수정합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     @PutMapping("/reviews/{reviewId}")
     public ResponseEntity<CommonResponse<ReviewResponse>> updateReview(
-            //@AuthenticationPrincipal AuthMember authMember, , auth 연결후 주석 제거 예정
-            @RequestParam Long memberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @Parameter(description = "리뷰 ID", example = "1")
             @PathVariable Long reviewId,
             @Valid @RequestBody ReviewUpdateRequest request
     ) {
         ReviewResponse response = reviewService.updateReview(
                 reviewId,
-                memberId, // authMember.memberId(),
+                authMember.memberId(),
                 request
         );
 
@@ -100,19 +102,18 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 삭제",
-            description = "본인이 작성한 리뷰를 삭제합니다."
+            description = "본인이 작성한 리뷰를 삭제합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     @DeleteMapping("/reviews/{reviewId}")
     public ResponseEntity<Void> deleteReview(
-            //@AuthenticationPrincipal AuthMember authMember, auth 연결후 주석 제거 예정
-            @RequestParam Long memberId,
+            @AuthenticationPrincipal AuthMember authMember,
             @Parameter(description = "리뷰 ID", example = "1")
             @PathVariable Long reviewId
     ) {
         reviewService.deleteReview(
                 reviewId,
-                memberId //authMember.memberId()
-
+                authMember.memberId()
         );
 
         return ResponseEntity.noContent().build();
