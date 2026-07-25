@@ -34,11 +34,10 @@ public class CategoryServiceImpl implements CategoryService{
                 .categoryName(request.getCategoryName())
                 .parentCategory(null)
                 .build();
-        CategoryEntity savedCategory = categoryRepository.save(category);
-        return CategoryResponse.from(savedCategory);
+        return CategoryResponse.from(categoryRepository.save(category));
     }
 
-    //중분류 생성
+    //소분류 생성
     @Override
     @Transactional
     public CategoryResponse createMiddleCategory(Long parentId, CategoryCreateRequest request) {
@@ -76,7 +75,7 @@ public class CategoryServiceImpl implements CategoryService{
         }
 
         category.update(categoryName);
-        return CategoryResponse.from(category);
+        return CategoryResponse.from(categoryRepository.save(category));
     }
 
     //카테고리 삭제
@@ -91,7 +90,7 @@ public class CategoryServiceImpl implements CategoryService{
             if (categoryRepository.existsByParentCategory(category)) {
                 throw new BusinessException(ErrorCode.CATEGORY_HAS_CHILDREN);
             }
-        }//중분류 카테고리
+        }//소분류 카테고리
         else {
             if (productRepository.existsByCategory(category)) {
                 throw new BusinessException(ErrorCode.CATEGORY_HAS_PRODUCTS);

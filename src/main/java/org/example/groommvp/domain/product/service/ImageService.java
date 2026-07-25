@@ -28,8 +28,8 @@ public class ImageService {
                 .filter(found -> found.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        if (imageRepository.countByProductProductId(ProductId) >= 10) {
-            throw new BusinessException(Errorcode.IMAGE_LIMIT_EXCEEDED);
+        if (imageRepository.countByProductProductId(productId) >= 10) {
+            throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
         }
 
         ImageEntity image = ImageEntity.builder()
@@ -47,9 +47,9 @@ public class ImageService {
         ImageEntity image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
 
-        image.update(deleteImage());
+        image.update(request.getDetailImage());
 
-        return ImageResponse.from(image);
+        return ImageResponse.from(imageRepository.save(image));
     }
 
     //이미지 삭제
@@ -59,7 +59,7 @@ public class ImageService {
         ImageEntity image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
 
-        ImageResponse response = ImageResponse9o8i.from(image);
+        ImageResponse response = ImageResponse.from(image);
         imageRepository.delete(image);
         return response;
     }

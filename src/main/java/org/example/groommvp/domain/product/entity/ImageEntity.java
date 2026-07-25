@@ -33,4 +33,10 @@ public class ImageEntity extends BaseEntity {
         this.product = product;
         this.detailImage = detailImage;
     }
+
+    public void update(
+            String detailImage
+    ) {
+        this.detailImage = detailImage;
+    }
 }
