@@ -33,12 +33,12 @@ public class SecurityConfig {
                                 "/api/v1/members/me",
                                 "/api/v1/members/me/**",
                                 "/api/v1/carts/**",
+                                "/api/v1/orders/**",
+                                "/api/v1/products/*/orders",
                                 "/api/v1/coupons/*/issue",
                                 "/api/v1/events/*/participate",
                                 "/api/v1/reviews"
                                 /*
-                                "api/v1/orders/{orderId}",
-                                "api/v1/products/{productId}/orders"
                                 */
                         ).authenticated()
                         // 쿠폰 등록 등 쿠폰 관리 API는 ADMIN 전용
