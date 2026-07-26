@@ -64,16 +64,13 @@ public class FirstComeEventService {
             Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         } catch (RedisException e) {
-            log.error(
-                    "event_lock_redis_error lockKey={} eventId={} memberId={} "
-                            + "clientShutdown={} clientShuttingDown={}",
-                    lockKey,
-                    eventId,
-                    memberId,
-                    redissonClient.isShutdown(),
-                    redissonClient.isShuttingDown(),
-                    e
-            );
+            log.atError()
+                    .setCause(e)
+                    .addKeyValue("lockKey", lockKey)
+                    .addKeyValue("eventId", eventId)
+                    .addKeyValue("clientShutdown", redissonClient.isShutdown())
+                    .addKeyValue("clientShuttingDown", redissonClient.isShuttingDown())
+                    .log("event_lock_redis_error");
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         } finally {
             if (locked) {
@@ -81,15 +78,13 @@ public class FirstComeEventService {
                     if (lock.isHeldByCurrentThread()) {
                         lock.unlock(); // 성공/실패와 상관없이 잡은 락은 다시 풀어줌
                     }
-                } catch (RedisException e) {
+                } catch (RedisException | IllegalMonitorStateException e) {
                     // 운영 로그 수집기의 error 알림 대상으로 사용한다.
-                    log.error(
-                            "event_lock_unlock_failed lockKey={} eventId={} memberId={}",
-                            lockKey,
-                            eventId,
-                            memberId,
-                            e
-                    );
+                    log.atError()
+                            .setCause(e)
+                            .addKeyValue("lockKey", lockKey)
+                            .addKeyValue("eventId", eventId)
+                            .log("event_lock_unlock_failed");
                 }
             }
         }
