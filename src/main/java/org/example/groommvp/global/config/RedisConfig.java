@@ -15,10 +15,14 @@ public class RedisConfig {
     @Value("${redis.port}")
     private int redisPort;
 
+    @Value("${redis.lock-watchdog-timeout-ms:30000}")
+    private long lockWatchdogTimeoutMs;
+
     @Bean(destroyMethod = "shutdown")
     public RedissonClient redissonClient() {
         Config config = new Config();
         config.setLazyInitialization(true);
+        config.setLockWatchdogTimeout(lockWatchdogTimeoutMs);
         config.useSingleServer().setAddress("redis://" + redisHost + ":" + redisPort);
         return Redisson.create(config);
     }

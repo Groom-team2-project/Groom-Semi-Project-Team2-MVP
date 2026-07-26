@@ -19,6 +19,8 @@ spring:
 redis:
     host: ${REDIS_HOST}
     port: ${REDIS_PORT}
+    # leaseTime을 지정하지 않은 Redisson 락의 watchdog TTL입니다.
+    lock-watchdog-timeout-ms: ${REDIS_LOCK_WATCHDOG_TIMEOUT_MS:30000}
 
 springdoc:
     swagger-ui:
