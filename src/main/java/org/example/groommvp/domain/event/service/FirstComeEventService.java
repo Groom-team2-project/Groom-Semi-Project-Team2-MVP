@@ -29,9 +29,10 @@ public class FirstComeEventService {
 
         boolean locked = false;
         try {
-            locked = lock.tryLock(3, 10, TimeUnit.SECONDS); // 최대 3초 기다리고, 락을 잡으면 10초 뒤 자동 만료
+            locked = lock.tryLock(3, TimeUnit.SECONDS);
+
             if (!locked) {
-                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+                throw new BusinessException(ErrorCode.EVENT_LOCK_TIMEOUT);
             }
 
             return transactionTemplate.execute(status -> {
