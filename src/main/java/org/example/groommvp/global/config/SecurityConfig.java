@@ -5,6 +5,7 @@ import org.example.groommvp.domain.auth.service.JwtTokenProvider;
 import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -19,38 +20,47 @@ public class SecurityConfig {
         JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtTokenProvider);
 
         return http
-                .csrf(AbstractHttpConfigurer::disable) // OAuth만 사용하므로 CSRF도 끔. 단, 자체 로그인 제작시 해당 항목 삭제할 것.
+                .csrf(AbstractHttpConfigurer::disable) // OAuth留??ъ슜?섎?濡?CSRF???? ?? ?먯껜 濡쒓렇???쒖옉???대떦 ??ぉ ??젣??寃?
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable) // 폼 로그인 기능 명시적 제거
+                .formLogin(AbstractHttpConfigurer::disable) // ??濡쒓렇??湲곕뒫 紐낆떆???쒓굅
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
                                 SecurityErrorResponseWriter.write(response, ErrorCode.UNAUTHORIZED))
+                        .accessDeniedHandler(((request, response, accessDeniedException) ->
+                                SecurityErrorResponseWriter.write(response, ErrorCode.FORBIDDEN)))
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                // 아래에 인증 필요 API 입력
                                 "/api/v1/members/me",
                                 "/api/v1/members/me/**",
                                 "/api/v1/carts/**",
                                 "/api/v1/orders/**",
                                 "/api/v1/products/*/orders",
                                 "/api/v1/coupons/*/issue",
-                                "/api/v1/events/*/participate",
-                                "/api/v1/reviews"
-                                /*
-                                */
+                                "/api/v1/events/*/participate"
                         ).authenticated()
-                        // 쿠폰 등록 등 쿠폰 관리 API는 ADMIN 전용
+                        .requestMatchers(HttpMethod.POST, "/api/v1/reviews").authenticated()
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/reviews/*").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/reviews/*").authenticated()
                         .requestMatchers("/api/v1/admin/coupons/**").hasRole("ADMIN")
-                        // 이하는 ADMIN 역할이 필요한 API들이며, 개발 완료시 주석 해제하여 사용할 것.
-                        /*
+                        .requestMatchers(HttpMethod.POST, "/api/v1/products").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/products/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/products/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/products/*/stock-in").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/*/stock-histories").hasRole("ADMIN")
                         .requestMatchers(
-                                "/api/v1/products/{productId}/stock-in",
-                                "/api/v1/products/{productId}/stock",
-                                "/api/v1/products/{productId}/stock-histories"
+                                HttpMethod.POST,
+                                "/api/v1/products/*/images"
                         ).hasRole("ADMIN")
-                         */
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/v1/products/*/images"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/categories").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/categories/*/children").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/categories/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/categories/*").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
