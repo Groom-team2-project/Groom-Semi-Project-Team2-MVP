@@ -3,6 +3,7 @@ package org.example.groommvp.domain.cancel.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -21,6 +22,7 @@ import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
+import org.example.groommvp.domain.stock.entity.StockHistoryType;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -68,6 +70,45 @@ class OrderCancelServiceTest {
 		assertThat(response.restoredItems().get(0).productId()).isEqualTo(10L);
 		assertThat(response.restoredItems().get(0).quantity()).isEqualTo(2);
 		verify(stockHistoryRepository).save(any(StockHistoryEntity.class)); // RESTORE 이력 저장됨
+	}
+
+	@Test
+	@DisplayName("PENDING_PAYMENT 주문 취소 시 실제 재고는 유지하고 예약만 해제한다")
+	void cancel_pendingPayment_releasesReservation() {
+		// given
+		Long orderId = 2L;
+		ProductEntity product = product(10L, "티셔츠", 10000);
+		Order order = Order.pendingPayment(20000L);
+		ReflectionTestUtils.setField(order, "id", orderId);
+
+		OrderItem orderItem = new OrderItem(order, product, 2, 10000);
+		StockEntity stock = StockEntity.builder()
+				.product(product)
+				.stocks(10)
+				.build();
+		stock.reserve(2);
+
+		given(orderRepository.findByIdWithPessimisticLock(orderId))
+				.willReturn(Optional.of(order));
+		given(orderItemRepository.findByOrder(order))
+				.willReturn(List.of(orderItem));
+		given(stockRepository.findByProductIdWithPessimisticLock(10L))
+				.willReturn(Optional.of(stock));
+		given(stockHistoryRepository.save(any(StockHistoryEntity.class)))
+				.willAnswer(invocation -> invocation.getArgument(0));
+
+		// when
+		OrderCancelResponse response = orderCancelService.cancel(orderId);
+
+		// then
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+		assertThat(stock.getStocks()).isEqualTo(10);
+		assertThat(stock.getReservedStocks()).isZero();
+		assertThat(response.restoredItems()).hasSize(1);
+		verify(stockHistoryRepository).save(argThat(history ->
+				history.getChangeType() == StockHistoryType.RELEASE
+						&& history.getChangedQty() == 2
+		));
 	}
 
 	@Test
