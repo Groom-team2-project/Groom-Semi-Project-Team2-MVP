@@ -43,11 +43,17 @@ public class OrderCancelService {
     }
 
     @Transactional
-    public OrderCancelResponse cancel(Long orderId) {
+    public OrderCancelResponse cancel(Long orderId, Long memberId) {
 
         // 1. 주문 조회
         Order order = orderRepository.findByIdWithPessimisticLock(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (memberId == null
+                || order.getMemberId() == null
+                || !order.getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.ORDER_FORBIDDEN);
+        }
 
         OrderStatus previousStatus = order.getStatus(); // 취소하기 전 상태 기억
 

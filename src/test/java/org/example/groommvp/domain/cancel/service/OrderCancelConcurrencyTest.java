@@ -57,7 +57,8 @@ class OrderCancelConcurrencyTest {
         // given: 상품 / 재고(0) / 주문(COMPLETED) / 주문품목(2개) 준비
         ProductEntity product = productRepository.save(ProductEntity.builder().productName("Test Product").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 0));                 // 취소 전 재고 0
-        Order order = orderRepository.save(new Order(20000L));             // COMPLETED 주문
+        Long memberId = 100L;
+        Order order = orderRepository.save(new Order(memberId, 20000L));   // COMPLETED 주문
         orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 구매했던 품목
         Long orderId = order.getId();
 
@@ -73,7 +74,7 @@ class OrderCancelConcurrencyTest {
             executorService.submit(() -> {
                 try {
                     startLatch.await();                  // 신호총 울릴 때까지 대기
-                    orderCancelService.cancel(orderId);
+                    orderCancelService.cancel(orderId, memberId);
                     successCount.incrementAndGet();      // 취소 성공
                 } catch (BusinessException e) {
                     failCount.incrementAndGet();         // 중복 취소로 차단됨
@@ -115,8 +116,9 @@ class OrderCancelConcurrencyTest {
         stock.reserve(2);
         stockRepository.save(stock);
 
+        Long memberId = 100L;
         Order order = orderRepository.save(
-                Order.pendingPayment(20000L)
+                Order.pendingPayment(memberId, 20000L)
         );
 
         orderItemRepository.save(
@@ -136,7 +138,7 @@ class OrderCancelConcurrencyTest {
             executorService.submit(() -> {
                 try {
                     startLatch.await();
-                    orderCancelService.cancel(orderId);
+                    orderCancelService.cancel(orderId, memberId);
                     successCount.incrementAndGet();
                 } catch (BusinessException e) {
                     failCount.incrementAndGet();

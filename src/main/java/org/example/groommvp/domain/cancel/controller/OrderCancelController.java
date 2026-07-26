@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.groommvp.domain.cancel.dto.OrderCancelResponse;
 import org.example.groommvp.domain.cancel.service.OrderCancelService;
+import org.example.groommvp.domain.auth.security.AuthMember;
 import org.example.groommvp.global.response.CommonResponse;
 import org.example.groommvp.global.response.ErrorResponse;
 import org.example.groommvp.global.response.SwaggerResponse;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Tag(name = "Order", description = "주문 API")
 @RestController
@@ -104,10 +106,12 @@ public class OrderCancelController {
 	})
 	@PostMapping("/{orderId}/cancel")
 	public ResponseEntity<CommonResponse<OrderCancelResponse>> cancel(
-		@Parameter(description = "주문 ID", example = "42", required = true)
-		@PathVariable Long orderId
+			@Parameter(description = "주문 ID", example = "42", required = true)
+			@PathVariable Long orderId,
+			@Parameter(hidden = true)
+			@AuthenticationPrincipal AuthMember authMember
 	) {
-		OrderCancelResponse response = orderCancelService.cancel(orderId);
+		OrderCancelResponse response = orderCancelService.cancel(orderId, authMember.memberId());
 		return ResponseEntity.ok(
 			CommonResponse.success(response, "주문이 취소되었습니다.")
 		);
