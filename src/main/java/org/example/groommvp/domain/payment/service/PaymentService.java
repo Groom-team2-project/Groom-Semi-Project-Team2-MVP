@@ -55,9 +55,14 @@ public class PaymentService {
 			throw new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS);
 		}
 
+		// 클라이언트가 보낸 주문번호가 이 주문의 것인지 확인 (다른 주문의 결제를 가로채지 못하게)
+		if (!request.tossOrderId().startsWith(orderPrefix(orderId))) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+		}
+
 		// 토스 결제 승인
 		try {
-			tossPaymentClient.confirm(request.paymentKey(), "ORDER_" + orderId, order.getTotalPrice());
+			tossPaymentClient.confirm(request.paymentKey(), request.tossOrderId(), order.getTotalPrice());
 		} catch (RestClientException e) {
 			// 토스가 돌려준 실패 원인(상태코드 + 응답 본문)을 로그로 남긴다
 			log.error("토스 결제 승인 실패: {}", e.getMessage(), e);
@@ -114,6 +119,14 @@ public class PaymentService {
 		order.cancel();
 
 		return RefundResponse.from(payment);
+	}
+
+	/**
+	 * 주문번호 접두사. 클라이언트는 {@code ORDER_{주문PK}_{시도구분}} 형태로 주문번호를 만든다.
+	 * (토스 orderId 는 재사용할 수 없어 재시도마다 새 값이 필요하다)
+	 */
+	private String orderPrefix(Long orderId) {
+		return "ORDER_" + orderId + "_";
 	}
 
 	private void confirmReservedStocks(Order order, List<OrderItem> orderItems) {

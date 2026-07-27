@@ -18,8 +18,9 @@ export function PaymentSuccessPage() {
     requested.current = true;
 
     const paymentKey = params.get('paymentKey');
+    // 토스가 되돌려준 주문번호 = ORDER_{주문PK}_{시도}. 승인 요청에 그대로 넘겨야 한다.
     const tossOrderId = params.get('orderId') ?? '';
-    const orderPk = tossOrderId.replace('ORDER_', '');
+    const orderPk = tossOrderId.split('_')[1] ?? '';
     const method = sessionStorage.getItem(PAYMENT_METHOD_KEY) ?? 'CARD';
 
     if (!paymentKey || !orderPk) {
@@ -27,7 +28,7 @@ export function PaymentSuccessPage() {
       return;
     }
 
-    confirmPayment(orderPk, paymentKey, method)
+    confirmPayment(orderPk, paymentKey, tossOrderId, method)
       .then(() => {
         toast('결제가 완료되었어요. 확인 메일을 보냈어요.');
         navigate(`/orders/${orderPk}`, { replace: true });
@@ -41,7 +42,7 @@ export function PaymentSuccessPage() {
       });
   }, [params, navigate, toast]);
 
-  const orderPk = (params.get('orderId') ?? '').replace('ORDER_', '');
+  const orderPk = (params.get('orderId') ?? '').split('_')[1] ?? '';
 
   return (
     <div style={{ textAlign: 'center', paddingTop: 80 }} className="rise">

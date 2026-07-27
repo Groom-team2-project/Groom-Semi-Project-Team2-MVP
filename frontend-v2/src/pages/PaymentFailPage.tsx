@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 // 토스 결제창에서 실패/취소 시 리다이렉트되는 화면 — 주문은 PENDING 유지라 재시도 가능
 export function PaymentFailPage() {
   const [params] = useSearchParams();
-  const orderPk = (params.get('orderId') ?? '').replace('ORDER_', '');
+  // 주문번호 형식: ORDER_{주문PK}_{시도}
+  const orderPk = (params.get('orderId') ?? '').split('_')[1] ?? '';
 
   return (
     <div style={{ textAlign: 'center', paddingTop: 80 }} className="rise">
