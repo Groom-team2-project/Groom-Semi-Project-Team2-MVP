@@ -757,6 +757,26 @@ h3 {
   background: #fbf4e8;
 }
 
+/* 마이페이지 오른쪽 열: 장바구니 · 주문 내역 · 쿠폰/포인트 패널을 세로로 쌓는다. */
+.mypage-main {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+}
+
+/* 장바구니 항목의 수량 +/- · 삭제 버튼 */
+.cart-item-controls {
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cart-item-controls button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+}
+
 /* ===== 마이페이지 주문 내역 ===== */
 
 .order-history {

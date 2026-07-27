@@ -60,7 +60,7 @@ public class PurchaseServiceConcurrencyTest {
     @DisplayName("로그인 회원 주문은 주문자 회원 ID를 저장한다")
     void purchaseWithMemberIdStoresOrderOwner() {
         ProductEntity product = productRepository.save(
-                new ProductEntity("Member Product", 10000)
+                new ProductEntity("Member Product", 10000, null, null)
         );
         stockRepository.save(new StockEntity(product, 10));
 
