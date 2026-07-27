@@ -48,13 +48,18 @@ public class OrderCancelService {
         Order order = orderRepository.findByIdWithPessimisticLock(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
-        // 2. 취소 — 재고 처리 방식은 "취소 전" 상태로 갈린다.
-        //    결제 대기(예약만 잡힌) 주문은 실재고가 줄지 않았으므로 예약만 해제하고,
-        //    결제 완료 주문은 실재고가 이미 차감됐으므로 실재고를 복구한다.
-        boolean reservedOnly = order.getStatus().isPendingPayment();
+        // 2. 결제 완료 주문은 이 API로 취소할 수 없다.
+        //    여기서 취소하면 재고만 복구되고 결제 금액은 환불되지 않으므로,
+        //    토스 결제 취소까지 수행하는 환불 API(POST /orders/{id}/payments/refund)로만 처리한다.
+        if (order.getStatus().isCompleted()) {
+            throw new BusinessException(ErrorCode.ORDER_REFUND_REQUIRED);
+        }
+
+        // 3. 취소 — 결제 전이라 실재고는 줄지 않았으므로 예약만 해제한다.
+        //    (결제 완료 주문의 실재고 복구는 환불 흐름에서 처리한다)
         order.cancel();
 
-        // 3. 이 주문에 속한 품목들 조회
+        // 4. 이 주문에 속한 품목들 조회
         List<OrderItem> orderItems = orderItemRepository.findByOrder(order);
 
 
@@ -66,17 +71,11 @@ public class OrderCancelService {
             StockEntity stock = stockRepository.findByProductIdWithPessimisticLock(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
 
-            if (reservedOnly) {
-                stock.release(quantity);
-                stockHistoryRepository.save(
-                    StockHistoryEntity.release(stock, orderId, quantity, CANCEL_REASON)
-                );
-            } else {
-                stock.increase(quantity);
-                stockHistoryRepository.save(
-                    StockHistoryEntity.restore(stock, orderId, quantity, CANCEL_REASON)
-                );
-            }
+            stock.release(quantity);
+
+            stockHistoryRepository.save(
+                StockHistoryEntity.release(stock, orderId, quantity, CANCEL_REASON)
+            );
 
             restoredItems.add(new RestoredItemResponse(productId, quantity));
         }

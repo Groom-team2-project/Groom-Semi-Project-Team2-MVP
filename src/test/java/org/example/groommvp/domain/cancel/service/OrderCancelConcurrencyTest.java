@@ -48,11 +48,13 @@ class OrderCancelConcurrencyTest {
     @Test
     @DisplayName("같은 주문에 동시에 100개 취소 요청이 와도 딱 1번만 취소되고 재고도 1번만 복구된다")
     void concurrentCancel_onlyOnce() throws InterruptedException {
-        // given: 상품 / 재고(0) / 주문(COMPLETED) / 주문품목(2개) 준비
+        // given: 상품 / 재고(10개 중 2개 예약) / 주문(결제 대기) / 주문품목(2개) 준비
         ProductEntity product = productRepository.save(ProductEntity.builder().productName("Test Product").productPrice(10000).build());
-        stockRepository.save(new StockEntity(product, 0));                 // 취소 전 재고 0
-        Order order = orderRepository.save(new Order(20000L));             // COMPLETED 주문
-        orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 구매했던 품목
+        StockEntity stock = new StockEntity(product, 10);
+        stock.reserve(2);                                                  // 주문 시 예약된 2개
+        stockRepository.save(stock);
+        Order order = orderRepository.save(Order.pendingPayment(20000L));  // 결제 대기 주문
+        orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 주문했던 품목
         Long orderId = order.getId();
 
         int threadCount = 100;
@@ -88,8 +90,10 @@ class OrderCancelConcurrencyTest {
         assertThat(failCount.get()).isEqualTo(99);
 
         Order canceled = orderRepository.findById(orderId).orElseThrow();
-        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);        // 취소됨
-        assertThat(stockRepository.findAll().get(0).getStocks()).isEqualTo(2);   // 0 + 2, 딱 1번 복구
-        assertThat(stockHistoryRepository.count()).isEqualTo(1);                 // RESTORE 이력 1건뿐
+        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);              // 취소됨
+        StockEntity restored = stockRepository.findAll().get(0);
+        assertThat(restored.getStocks()).isEqualTo(10);                                // 결제 전이라 실재고 그대로
+        assertThat(restored.getReservedStocks()).isZero();                             // 예약이 딱 1번만 해제됨
+        assertThat(stockHistoryRepository.count()).isEqualTo(1);                       // RELEASE 이력 1건뿐
     }
 }
