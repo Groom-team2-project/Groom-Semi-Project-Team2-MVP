@@ -2,11 +2,13 @@ package org.example.groommvp.domain.cancel.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Comparator;
 
 import org.example.groommvp.domain.cancel.dto.OrderCancelResponse;
 import org.example.groommvp.domain.cancel.dto.RestoredItemResponse;
 import org.example.groommvp.domain.order.entity.Order;
 import org.example.groommvp.domain.order.entity.OrderItem;
+import org.example.groommvp.domain.order.entity.OrderStatus;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.stock.entity.StockEntity;
@@ -17,7 +19,6 @@ import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 
 @Service
 public class OrderCancelService {
@@ -42,18 +43,29 @@ public class OrderCancelService {
     }
 
     @Transactional
-    public OrderCancelResponse cancel(Long orderId) {
+    public OrderCancelResponse cancel(Long orderId, Long memberId) {
 
         // 1. 주문 조회
         Order order = orderRepository.findByIdWithPessimisticLock(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
+        if (memberId == null
+                || order.getMemberId() == null
+                || !order.getMemberId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.ORDER_FORBIDDEN);
+        }
+
+        OrderStatus previousStatus = order.getStatus(); // 취소하기 전 상태 기억
+
         // 2. 취소
         order.cancel();
 
         // 3. 이 주문에 속한 품목들 조회
-        List<OrderItem> orderItems = orderItemRepository.findByOrder(order);
-
+        List<OrderItem> orderItems = orderItemRepository.findByOrder(order).stream()
+                .sorted(Comparator.comparing(
+                        item -> item.getProduct().getProductId()
+                ))
+                .toList();
 
         List<RestoredItemResponse> restoredItems = new ArrayList<>();
         for (OrderItem orderItem : orderItems) {
@@ -63,11 +75,27 @@ public class OrderCancelService {
             StockEntity stock = stockRepository.findByProductIdWithPessimisticLock(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
 
-            stock.increase(quantity);
-
-            stockHistoryRepository.save(
-                StockHistoryEntity.restore(stock, orderId, quantity, CANCEL_REASON)
-            );
+            if (previousStatus == OrderStatus.PENDING_PAYMENT) {
+                stock.release(quantity);
+                stockHistoryRepository.save(
+                        StockHistoryEntity.release(
+                                stock,
+                                orderId,
+                                quantity,
+                                CANCEL_REASON
+                        )
+                );
+            } else if (previousStatus == OrderStatus.COMPLETED) {
+                stock.increase(quantity);
+                stockHistoryRepository.save(
+                        StockHistoryEntity.restore(
+                                stock,
+                                orderId,
+                                quantity,
+                                CANCEL_REASON
+                        )
+                );
+            }
 
             restoredItems.add(new RestoredItemResponse(productId, quantity));
         }

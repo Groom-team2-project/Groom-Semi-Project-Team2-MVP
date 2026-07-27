@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.example.groommvp.domain.cancel.dto.OrderCancelResponse;
 import org.example.groommvp.domain.cancel.service.OrderCancelService;
+import org.example.groommvp.domain.auth.security.AuthMember;
 import org.example.groommvp.global.response.CommonResponse;
 import org.example.groommvp.global.response.ErrorResponse;
 import org.example.groommvp.global.response.SwaggerResponse;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @Tag(name = "Order", description = "주문 API")
 @RestController
@@ -46,6 +48,28 @@ public class OrderCancelController {
 									    },
 									    "errorCode": null,
 									    "message": "주문이 취소되었습니다."
+									}
+									"""))),
+			@ApiResponse(responseCode = "401", description = "인증되지 않은 요청",
+					content = @Content(mediaType = "application/json",
+							schema = @Schema(implementation = ErrorResponse.class),
+							examples = @ExampleObject(value = """
+									{
+									    "success": false,
+									    "data": null,
+									    "errorCode": "UNAUTHORIZED",
+									    "message": "인증이 필요합니다."
+									}
+									"""))),
+			@ApiResponse(responseCode = "403", description = "본인 주문이 아님",
+					content = @Content(mediaType = "application/json",
+							schema = @Schema(implementation = ErrorResponse.class),
+							examples = @ExampleObject(value = """
+									{
+									    "success": false,
+									    "data": null,
+									    "errorCode": "ORDER_FORBIDDEN",
+									    "message": "본인의 주문만 취소할 수 있습니다."
 									}
 									"""))),
 			@ApiResponse(responseCode = "404", description = "주문 또는 재고 정보를 찾을 수 없음",
@@ -104,10 +128,12 @@ public class OrderCancelController {
 	})
 	@PostMapping("/{orderId}/cancel")
 	public ResponseEntity<CommonResponse<OrderCancelResponse>> cancel(
-		@Parameter(description = "주문 ID", example = "42", required = true)
-		@PathVariable Long orderId
+			@Parameter(description = "주문 ID", example = "42", required = true)
+			@PathVariable Long orderId,
+			@Parameter(hidden = true)
+			@AuthenticationPrincipal AuthMember authMember
 	) {
-		OrderCancelResponse response = orderCancelService.cancel(orderId);
+		OrderCancelResponse response = orderCancelService.cancel(orderId, authMember.memberId());
 		return ResponseEntity.ok(
 			CommonResponse.success(response, "주문이 취소되었습니다.")
 		);
