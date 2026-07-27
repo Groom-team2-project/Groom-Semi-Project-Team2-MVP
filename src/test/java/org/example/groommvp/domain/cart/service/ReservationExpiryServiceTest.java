@@ -89,7 +89,7 @@ class ReservationExpiryServiceTest {
     void setUp() {
         memberId = memberRepository.save(
                 MemberEntity.createKakaoMember("expiry", "ex@example.com", "회원")).getMemberId();
-        ProductEntity product = productRepository.save(new ProductEntity("티셔츠", 10_000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("티셔츠").productPrice(10_000).productImage("test.png").build());
         productId = product.getProductId();
         stockRepository.save(new StockEntity(product, INITIAL_STOCK));
     }

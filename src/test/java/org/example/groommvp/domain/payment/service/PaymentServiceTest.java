@@ -15,6 +15,7 @@ import org.example.groommvp.domain.payment.dto.RefundRequest;
 import org.example.groommvp.domain.payment.dto.RefundResponse;
 import org.example.groommvp.domain.payment.entity.Payment;
 import org.example.groommvp.domain.payment.entity.PaymentStatus;
+import org.example.groommvp.domain.payment.event.PaymentCompletedEvent;
 import org.example.groommvp.domain.payment.repository.PaymentRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.stock.entity.StockEntity;
@@ -31,6 +32,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.client.RestClientException;
 
 import static org.assertj.core.api.Assertions.*;
@@ -47,6 +49,7 @@ public class PaymentServiceTest {
 	@Mock private TossPaymentClient tossPaymentClient;   // 외부 호출은 Mock
 	@Mock private StockRepository stockRepository;
 	@Mock private StockHistoryRepository stockHistoryRepository;
+	@Mock private ApplicationEventPublisher eventPublisher;
 	@InjectMocks private PaymentService paymentService;
 
 	@Test
@@ -91,6 +94,8 @@ public class PaymentServiceTest {
 		assertThat(history.getChangeType()).isEqualTo(StockHistoryType.CONFIRM);
 		assertThat(history.getOrderId()).isEqualTo(orderId);
 		assertThat(history.getChangedQty()).isEqualTo(1);
+
+		verify(eventPublisher).publishEvent(any(PaymentCompletedEvent.class));
 	}
 
 	@Test

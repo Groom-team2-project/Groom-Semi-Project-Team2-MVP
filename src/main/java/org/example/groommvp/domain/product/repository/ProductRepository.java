@@ -18,6 +18,4 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     //카테고리 삭제 전 연결 확인
     boolean existsByCategory(CategoryEntity category);
 
-    //삭제되지 않은 상품만 연결
-    boolean existsByCategoryAndDeletedAtIsNull(CategoryEntity category);
 }

@@ -140,7 +140,7 @@ class CartOrderServiceConcurrencyTest {
     }
 
     private ProductEntity newProductWithStock(String name, int price) {
-        ProductEntity product = productRepository.save(new ProductEntity(name, price));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName(name).productPrice(price).productImage("test.png").build());
         stockRepository.save(new StockEntity(product, INITIAL_STOCK));
         return product;
     }

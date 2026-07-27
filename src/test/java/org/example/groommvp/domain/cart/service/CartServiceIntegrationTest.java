@@ -51,7 +51,7 @@ class CartServiceIntegrationTest {
         MemberEntity member = memberRepository.save(
                 MemberEntity.createKakaoMember("cart-integration", "ci@example.com", "장바구니회원"));
         memberId = member.getMemberId();
-        productId = productRepository.save(new ProductEntity("티셔츠", 10_000)).getProductId();
+        productId = productRepository.save(ProductEntity.builder().productName("티셔츠").productPrice(10_000).productImage("test.png").build()).getProductId();
     }
 
     @AfterEach

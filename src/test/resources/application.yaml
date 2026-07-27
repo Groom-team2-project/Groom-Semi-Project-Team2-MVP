@@ -14,6 +14,15 @@ spring:
       hibernate:
         format_sql: true
 
+  # EmailService 가 JavaMailSender 를 주입받으므로, 호스트가 없으면 해당 빈이 만들어지지 않아
+  # 모든 @SpringBootTest 컨텍스트 로딩이 실패한다. (운영 설정은 application-local.yaml 에만 있다)
+  # 테스트는 실제로 메일을 보내지 않으므로 자동 구성만 통과시키는 더미 호스트를 둔다.
+  mail:
+    host: localhost
+    port: 3025
+    username: test
+    password: test
+
 redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}

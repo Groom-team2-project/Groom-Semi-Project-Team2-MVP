@@ -528,7 +528,7 @@ class PartEPerformanceTest {
     }
 
     private ProductEntity newProduct(String name, int price) {
-        return productRepository.save(new ProductEntity(name, price));
+        return productRepository.save(ProductEntity.builder().productName(name).productPrice(price).productImage("test.png").build());
     }
 
     private CouponEntity newCoupon(int totalQuantity) {

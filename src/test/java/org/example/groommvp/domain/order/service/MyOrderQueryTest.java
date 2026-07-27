@@ -80,7 +80,7 @@ class MyOrderQueryTest {
                 MemberEntity.createKakaoMember("orders-me", "me@example.com", "나")).getMemberId();
         otherMemberId = memberRepository.save(
                 MemberEntity.createKakaoMember("orders-other", "other@example.com", "남")).getMemberId();
-        ProductEntity product = productRepository.save(new ProductEntity("티셔츠", 10_000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("티셔츠").productPrice(10_000).productImage("test.png").build());
         productId = product.getProductId();
         stockRepository.save(new StockEntity(product, 1_000));
     }

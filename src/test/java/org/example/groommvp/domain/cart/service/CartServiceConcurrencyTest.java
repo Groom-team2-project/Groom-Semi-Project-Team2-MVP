@@ -60,7 +60,7 @@ class CartServiceConcurrencyTest {
         MemberEntity member = memberRepository.save(
                 MemberEntity.createKakaoMember("cart-concurrent", "c@example.com", "장바구니회원"));
         Long memberId = member.getMemberId();
-        ProductEntity product = productRepository.save(new ProductEntity("티셔츠", 10_000));
+        ProductEntity product = productRepository.save(ProductEntity.builder().productName("티셔츠").productPrice(10_000).productImage("test.png").build());
         Long productId = product.getProductId();
 
         int threadCount = 20;

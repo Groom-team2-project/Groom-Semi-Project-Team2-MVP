@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 public enum ErrorCode {
 
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메서드입니다."),
@@ -23,6 +24,8 @@ public enum ErrorCode {
     INVALID_STOCK_QUANTITY(HttpStatus.BAD_REQUEST, "재고 수량은 1 이상이어야 합니다."),
     STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "재고를 찾을 수 없습니다."),
     OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+
+    EVENT_LOCK_TIMEOUT(HttpStatus.CONFLICT, "선착순 이벤트 요청이 몰리고 있습니다. 잠시 후 다시 시도해주세요."),
 
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
     ORDER_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원의 주문에 접근할 수 없습니다."),
@@ -55,18 +58,20 @@ public enum ErrorCode {
     COUPON_MIN_ORDER_NOT_MET(HttpStatus.BAD_REQUEST, "쿠폰 사용 최소 주문 금액을 충족하지 않습니다."),
 
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
-    IMAGE_ALREADY_EXISTS(HttpStatus.CONFLICT, "상품 이미지는 하나만 등록할 수 있습니다."),
+    IMAGE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "이미지는 최대 10장까지 가능합니다."),
     
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
     CATEGORY_NAME_DUPLICATED(HttpStatus.CONFLICT, "중복된 카테고리명입니다."),
-    PARENT_CATEGORY_MISSING(HttpStatus.CONFLICT, "중분류 카테고리를 입력하세요."),
-    INVALID_PARENT_CATEGORY(HttpStatus.CONFLICT, "대분류에만 추가할 수 있습니다."),
+    INVALID_PARENT_CATEGORY(HttpStatus.CONFLICT, "중분류는 대분류에 추가할 수 있습니다."),
+    INVALID_PRODUCT_CATEGORY(HttpStatus.BAD_REQUEST, "상품은 중분류에 추가할 수 있습니다."),
     CATEGORY_HAS_CHILDREN(HttpStatus.CONFLICT, "하위 카테고리가 있어 카테고리를 삭제할 수 없습니다."),
     CATEGORY_HAS_PRODUCTS(HttpStatus.CONFLICT, "연결된 상품이 있어 카테고리를 삭제할 수 없습니다."),
+    CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 내용이 없습니다."),
 
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "동일 회원은 동일 상품에 리뷰를 하나만 등록할 수 있습니다."),
     REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원이 작성한 리뷰에 접근할 수 없습니다."),
+    REVIEW_PURCHASE_REQUIRED(HttpStatus.FORBIDDEN, "결제 완료된 구매 상품만 리뷰를 작성할 수 있습니다."),
 
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제를 찾을 수 없습니다."),
     PAYMENT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 결제된 주문입니다."),
