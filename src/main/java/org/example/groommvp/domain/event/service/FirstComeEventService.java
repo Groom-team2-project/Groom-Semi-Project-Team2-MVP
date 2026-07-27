@@ -11,27 +11,34 @@ import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.redisson.client.RedisException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FirstComeEventService {
+    private static final String EVENT_LOCK_KEY_FORMAT = "event:%d:lock";
+
     private final RedissonClient redissonClient;
     private final FirstComeEventRepository eventRepository;
     private final FirstComeEventParticipantRepository participantRepository;
     private final TransactionTemplate transactionTemplate;
 
     public FirstComeEventParticipateResponse participate(Long eventId, Long memberId) {
-        RLock lock = redissonClient.getLock("event:" +  eventId + ":lock"); // 이벤트별로 락 이름 생성
+        String lockKey = EVENT_LOCK_KEY_FORMAT.formatted(eventId);
+        RLock lock = redissonClient.getLock(lockKey); // 이벤트별로 락 이름 생성
 
         boolean locked = false;
         try {
-            locked = lock.tryLock(3, 10, TimeUnit.SECONDS); // 최대 3초 기다리고, 락을 잡으면 10초 뒤 자동 만료
+            locked = lock.tryLock(3, TimeUnit.SECONDS);
+
             if (!locked) {
-                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+                throw new BusinessException(ErrorCode.EVENT_LOCK_TIMEOUT);
             }
 
             return transactionTemplate.execute(status -> {
@@ -56,9 +63,29 @@ public class FirstComeEventService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
+        } catch (RedisException e) {
+            log.atError()
+                    .setCause(e)
+                    .addKeyValue("lockKey", lockKey)
+                    .addKeyValue("eventId", eventId)
+                    .addKeyValue("clientShutdown", redissonClient.isShutdown())
+                    .addKeyValue("clientShuttingDown", redissonClient.isShuttingDown())
+                    .log("event_lock_redis_error");
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
         } finally {
-            if (locked && lock.isHeldByCurrentThread()) {
-                lock.unlock(); // 성공/실패와 상관없이 잡은 락은 다시 풀어줌
+            if (locked) {
+                try {
+                    if (lock.isHeldByCurrentThread()) {
+                        lock.unlock(); // 성공/실패와 상관없이 잡은 락은 다시 풀어줌
+                    }
+                } catch (RedisException | IllegalMonitorStateException e) {
+                    // 운영 로그 수집기의 error 알림 대상으로 사용한다.
+                    log.atError()
+                            .setCause(e)
+                            .addKeyValue("lockKey", lockKey)
+                            .addKeyValue("eventId", eventId)
+                            .log("event_lock_unlock_failed");
+                }
             }
         }
     }
