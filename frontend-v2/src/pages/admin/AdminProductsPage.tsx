@@ -88,11 +88,19 @@ export function AdminProductsPage() {
             <input className="input" placeholder="상품명" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 2, minWidth: 160 }} />
             <input className="input" placeholder="가격" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} style={{ flex: 1, minWidth: 110 }} />
             <input className="input" placeholder="초기 재고" type="number" min={0} value={stocks} onChange={(e) => setStocks(e.target.value)} style={{ flex: 1, minWidth: 110 }} />
-            <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ minWidth: 140 }}>
+            {/* 상품은 중분류에만 등록 가능(백엔드 규칙) — 대분류는 목록에서 제외 */}
+            <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ minWidth: 170 }}>
               <option value="">카테고리 없음</option>
-              {(categories ?? []).map((c) => (
-                <option key={c.categoryId} value={c.categoryId}>{c.categoryName}</option>
-              ))}
+              {(categories ?? [])
+                .filter((c) => c.parentCategory != null)
+                .map((c) => {
+                  const parent = (categories ?? []).find((p) => p.categoryId === c.parentCategory);
+                  return (
+                    <option key={c.categoryId} value={c.categoryId}>
+                      {parent ? `${parent.categoryName} > ` : ''}{c.categoryName}
+                    </option>
+                  );
+                })}
             </select>
             <button className="btn btn-primary btn-sm" disabled={createMutation.isPending}>등록</button>
           </form>
