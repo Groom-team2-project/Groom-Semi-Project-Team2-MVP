@@ -50,6 +50,28 @@ public class OrderCancelController {
 									    "message": "주문이 취소되었습니다."
 									}
 									"""))),
+			@ApiResponse(responseCode = "401", description = "인증되지 않은 요청",
+					content = @Content(mediaType = "application/json",
+							schema = @Schema(implementation = ErrorResponse.class),
+							examples = @ExampleObject(value = """
+									{
+									    "success": false,
+									    "data": null,
+									    "errorCode": "UNAUTHORIZED",
+									    "message": "인증이 필요합니다."
+									}
+									"""))),
+			@ApiResponse(responseCode = "403", description = "본인 주문이 아님",
+					content = @Content(mediaType = "application/json",
+							schema = @Schema(implementation = ErrorResponse.class),
+							examples = @ExampleObject(value = """
+									{
+									    "success": false,
+									    "data": null,
+									    "errorCode": "ORDER_FORBIDDEN",
+									    "message": "본인의 주문만 취소할 수 있습니다."
+									}
+									"""))),
 			@ApiResponse(responseCode = "404", description = "주문 또는 재고 정보를 찾을 수 없음",
 					content = @Content(mediaType = "application/json",
 							schema = @Schema(implementation = ErrorResponse.class),
