@@ -546,7 +546,7 @@ export default function App() {
     }
 
     if (data?.url) {
-      window.open(data.url, '_blank', 'noopener,noreferrer');
+      window.location.assign(data.url);
     }
   }
 
@@ -1527,7 +1527,7 @@ export default function App() {
               <article className="admin-card">
                 <div className="card-heading">
                   <div>
-                    <p className="eyebrow">Member</p>
+                    <p className="eyebrow">{token ? 'Member' : 'Guest'}</p>
                     <h2>내 정보</h2>
                   </div>
                   <button type="button" onClick={getMe} disabled={isLoading}>조회</button>
