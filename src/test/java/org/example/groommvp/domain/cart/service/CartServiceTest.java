@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
@@ -176,10 +177,11 @@ class CartServiceTest {
     class AddItem {
 
         @Test
-        @DisplayName("장바구니가 없으면 이때 생성한다")
+        @DisplayName("장바구니가 없으면 회원 행을 잠근 뒤 만든다 (갭 락 교착 회피)")
         void addItem_createsCartOnFirstAdd() {
+            given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
+                    .willReturn(Optional.of(member(OWNER_ID)));
             given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.empty());
-            given(memberRepository.findById(OWNER_ID)).willReturn(Optional.of(member(OWNER_ID)));
             given(cartRepository.save(org.mockito.ArgumentMatchers.any(CartEntity.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             given(productRepository.findById(1L)).willReturn(Optional.of(product(1L, "티셔츠", 10_000)));
@@ -187,7 +189,25 @@ class CartServiceTest {
             CartResponse response = cartService.addItem(OWNER_ID, new CartItemAddRequest(1L, 2));
 
             assertThat(response.totalQuantity()).isEqualTo(2);
+            verify(memberRepository).findByIdWithPessimisticLock(OWNER_ID);
             verify(cartRepository).save(org.mockito.ArgumentMatchers.any(CartEntity.class));
+            // 없는 장바구니 행을 FOR UPDATE 하면 갭 락이 잡혀 서로 다른 회원끼리도 교착한다.
+            verify(cartRepository, never())
+                    .findByMemberIdWithPessimisticLock(org.mockito.ArgumentMatchers.any());
+        }
+
+        @Test
+        @DisplayName("장바구니 중복 생성이 뚫리면 재시도 가능한 예외로 변환된다 (마지막 안전망)")
+        void addItem_convertsUniqueConstraintViolationOnFirstCreate() {
+            given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
+                    .willReturn(Optional.of(member(OWNER_ID)));
+            given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.empty());
+            given(cartRepository.save(org.mockito.ArgumentMatchers.any(CartEntity.class)))
+                    .willThrow(new DataIntegrityViolationException("duplicate member_id"));
+
+            assertThatThrownBy(() -> cartService.addItem(OWNER_ID, new CartItemAddRequest(1L, 1)))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CART_BUSY);
         }
 
         @Test
@@ -195,6 +215,8 @@ class CartServiceTest {
         void addItem_mergesQuantityForSameProduct() {
             CartEntity cart = cartOf(OWNER_ID);
             cart.addItem(product(1L, "티셔츠", 10_000), 2);
+            given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
+                    .willReturn(Optional.of(member(OWNER_ID)));
             given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.of(cart));
             given(productRepository.findById(1L)).willReturn(Optional.of(product(1L, "티셔츠", 10_000)));
 
@@ -205,11 +227,28 @@ class CartServiceTest {
         }
 
         @Test
+        @DisplayName("장바구니가 이미 있으면 새로 만들지 않고 회원 락만으로 직렬화한다")
+        void addItem_reusesExistingCart() {
+            CartEntity cart = cartOf(OWNER_ID);
+            given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
+                    .willReturn(Optional.of(member(OWNER_ID)));
+            given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.of(cart));
+            given(productRepository.findById(1L)).willReturn(Optional.of(product(1L, "티셔츠", 10_000)));
+
+            cartService.addItem(OWNER_ID, new CartItemAddRequest(1L, 1));
+
+            verify(memberRepository).findByIdWithPessimisticLock(OWNER_ID);
+            verify(cartRepository, never()).save(org.mockito.ArgumentMatchers.any(CartEntity.class));
+        }
+
+        @Test
         @DisplayName("삭제된 상품은 담을 수 없다")
         void addItem_throwsForDeletedProduct() {
             CartEntity cart = cartOf(OWNER_ID);
             ProductEntity deleted = product(1L, "티셔츠", 10_000);
             deleted.delete();
+            given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
+                    .willReturn(Optional.of(member(OWNER_ID)));
             given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.of(cart));
             given(productRepository.findById(1L)).willReturn(Optional.of(deleted));
 

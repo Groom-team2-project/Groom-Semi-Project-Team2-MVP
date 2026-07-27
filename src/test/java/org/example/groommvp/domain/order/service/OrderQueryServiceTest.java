@@ -45,7 +45,7 @@ class OrderQueryServiceTest {
     void getOrderByOwner() {
         Long memberId = 1L;
         Order order = orderRepository.save(Order.pendingPayment(memberId, 10000L));
-        ProductEntity product = productRepository.save(new ProductEntity("Owner Product", 10000));
+        ProductEntity product = productRepository.save(new ProductEntity("Owner Product", 10000, null, null));
         orderItemRepository.save(new OrderItem(order, product, 1, 10000));
 
         OrderResponse response = orderQueryService.getOrder(order.getId(), memberId);

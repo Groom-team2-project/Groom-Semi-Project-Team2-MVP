@@ -32,7 +32,59 @@
 
 로컬 테스트용으로 DB 에 직접 INSERT 한 데이터(테스트 회원, 상품, 쿠폰 등)는 운영 DB 에 넣지 않는다. `ddl-auto` 도 운영은 `validate`/`none` 권장(현재 로컬은 `update`).
 
-## 6. 참고: E 파트 남은 통합 지점 (배포와 별개)
+## 6. 유니크 제약 실재 확인 (필수)
 
-- 쿠폰/포인트를 실제 주문·결제에 연결(`CouponService.useCoupon`, `PointService.use` 진입점만 존재) — 파트 C/D 와 인터페이스 합의 후 연결.
-- 주문 내역 `GET /members/me/orders` — `Order` 에 회원 연결이 생겼으므로 구현 가능(추후).
+E 파트의 여러 방어 로직은 **유니크 제약을 최종 방어선**으로 삼는다. 애플리케이션 검증을 동시 요청이 통과하더라도 DB 가 막아주는 구조다.
+
+| 테이블 | 제약 | 없으면 벌어지는 일 |
+|---|---|---|
+| `carts` | `member_id` unique | 한 회원에게 장바구니가 여러 개 생김 |
+| `member_coupons` | `(member_id, coupon_id)` | 같은 쿠폰 중복 발급 |
+| `point_balances` | `member_id` unique | 잔액 행이 갈라져 포인트가 어긋남 |
+| `point_histories` | `(member_id, order_id, type)` | 결제 재시도/취소 재전송 시 포인트 이중 반영 |
+
+**문제**: 현재 `ddl-auto: update` 는 **이미 데이터가 있는 테이블에 유니크 제약을 조용히 추가하지 못할 수 있다.** (중복 행이 있으면 특히) 실패해도 애플리케이션은 정상 기동하므로 최종 방어선이 사라진 걸 눈치채지 못한다.
+
+배포 대상 DB 에서 아래를 실행해 4개가 모두 나오는지 확인한다.
+
+```sql
+SELECT TABLE_NAME, INDEX_NAME,
+       GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS COLS
+FROM INFORMATION_SCHEMA.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND NON_UNIQUE = 0
+  AND TABLE_NAME IN ('carts', 'member_coupons', 'point_balances', 'point_histories')
+  AND INDEX_NAME <> 'PRIMARY'
+GROUP BY TABLE_NAME, INDEX_NAME
+ORDER BY TABLE_NAME;
+```
+
+빠진 제약이 있으면 중복 행을 먼저 정리한 뒤 수동으로 추가한다.
+
+```sql
+ALTER TABLE point_histories
+  ADD CONSTRAINT UK_POINT_HISTORIES_MEMBER_ORDER_TYPE UNIQUE (member_id, order_id, type);
+```
+
+> 코드 레벨에서는 `UniqueConstraintTest` 가 실제로 중복 INSERT 를 시도해 제약 존재를 검증한다.
+> H2·MySQL 양쪽에서 통과하는 것을 확인했다. 다만 이 테스트는 `create-drop` 으로 새로 만든
+> 스키마를 보므로, **운영 DB 에 제약이 붙어 있는지는 위 SQL 로 별도 확인해야 한다.**
+
+## 7. 예약 재고 회수 스케줄러 (신규)
+
+미결제 주문이 재고를 영구 점유하지 않도록 `ReservationExpiryScheduler` 가 주기적으로 예약을 회수한다.
+
+| 설정 | 환경변수 | 기본값 |
+|---|---|---|
+| 활성화 | `CART_RESERVATION_EXPIRY_ENABLED` | `true` |
+| 회수 기준 시간 | `CART_RESERVATION_EXPIRY_TIMEOUT` | `PT30M` (30분) |
+| 실행 주기 | `CART_RESERVATION_EXPIRY_INTERVAL` | `PT1M` |
+| 주기당 최대 건수 | `CART_RESERVATION_EXPIRY_BATCH_SIZE` | `100` |
+
+- **타임아웃은 결제 제한시간보다 넉넉해야 한다.** 짧으면 결제 중인 주문의 재고를 뺏는다. (주문 행 락 + 상태 재확인으로 이중 처리는 막히지만, 결제 직전 취소되는 UX 문제가 생긴다)
+- **다중 인스턴스로 배포하면 한 대만 켠다.** 여러 대가 같은 주문을 집으면 불필요한 락 경합이 생긴다. (정합성은 깨지지 않는다)
+
+## 8. 참고: E 파트 남은 통합 지점 (배포와 별개)
+
+- **쿠폰/포인트를 실제 주문·결제에 연결** — `CouponService.useCoupon`, `PointService.use` 는 진입점만 있고 호출자가 없다. 파트 C/D 와 **할인/포인트를 어느 시점에 적용할지** 합의가 먼저다. 자세한 선택지는 `member-cart-point-design.md` §6 참고.
+- ~~주문 내역 `GET /members/me/orders`~~ — 구현 완료. 마이페이지에서 렌더링한다.

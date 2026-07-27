@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -74,7 +75,7 @@ public class MemberController {
     })
     @GetMapping("/me")
     public ResponseEntity<CommonResponse<MemberMeResponse>> getMe(
-            @AuthenticationPrincipal AuthMember authMember
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthMember authMember
     ) {
         MemberMeResponse response = memberService.getMe(authMember.memberId());
         return ResponseEntity.ok(CommonResponse.success(response, "내 회원 정보 조회 성공"));
@@ -121,7 +122,7 @@ public class MemberController {
     })
     @PatchMapping("/me")
     public ResponseEntity<CommonResponse<MemberMeResponse>> updateMe(
-            @AuthenticationPrincipal AuthMember authMember,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthMember authMember,
             @Valid @RequestBody MemberUpdateRequest request
     ) {
         MemberMeResponse response = memberService.updateMe(authMember.memberId(), request);
