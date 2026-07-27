@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../../api/products';
 import { getCategories } from '../../api/categories';
@@ -88,22 +89,33 @@ export function AdminProductsPage() {
             <input className="input" placeholder="상품명" value={name} onChange={(e) => setName(e.target.value)} style={{ flex: 2, minWidth: 160 }} />
             <input className="input" placeholder="가격" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} style={{ flex: 1, minWidth: 110 }} />
             <input className="input" placeholder="초기 재고" type="number" min={0} value={stocks} onChange={(e) => setStocks(e.target.value)} style={{ flex: 1, minWidth: 110 }} />
-            {/* 상품은 중분류에만 등록 가능(백엔드 규칙) — 대분류는 목록에서 제외 */}
+            {/* 상품은 중분류에만 등록 가능(백엔드 규칙) — 대분류별로 그룹핑해 노출 */}
             <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ minWidth: 170 }}>
               <option value="">카테고리 없음</option>
               {(categories ?? [])
-                .filter((c) => c.parentCategory != null)
-                .map((c) => {
-                  const parent = (categories ?? []).find((p) => p.categoryId === c.parentCategory);
+                .filter((p) => p.parentCategory == null)
+                .map((parent) => {
+                  const kids = (categories ?? []).filter((c) => c.parentCategory === parent.categoryId);
+                  if (kids.length === 0) return null;
                   return (
-                    <option key={c.categoryId} value={c.categoryId}>
-                      {parent ? `${parent.categoryName} > ` : ''}{c.categoryName}
-                    </option>
+                    <optgroup key={parent.categoryId} label={parent.categoryName}>
+                      {kids.map((c) => (
+                        <option key={c.categoryId} value={c.categoryId}>{c.categoryName}</option>
+                      ))}
+                    </optgroup>
                   );
                 })}
             </select>
             <button className="btn btn-primary btn-sm" disabled={createMutation.isPending}>등록</button>
           </form>
+          {(categories ?? []).length > 0 && !(categories ?? []).some((c) => c.parentCategory != null) && (
+            <p className="text-muted" style={{ marginTop: 12, fontSize: 13 }}>
+              상품은 <b>중분류</b>에 등록돼요. 아직 중분류가 없어서 카테고리 없이만 등록할 수 있어요 —{' '}
+              <Link to="/admin/categories" style={{ color: 'var(--buy)', fontWeight: 700 }}>
+                카테고리 탭에서 중분류 만들기
+              </Link>
+            </p>
+          )}
         </div>
       </div>
 
