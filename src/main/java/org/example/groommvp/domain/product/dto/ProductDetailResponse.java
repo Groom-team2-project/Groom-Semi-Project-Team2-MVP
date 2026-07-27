@@ -3,13 +3,17 @@ package org.example.groommvp.domain.product.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
+import org.example.groommvp.domain.product.entity.ImageEntity;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.stock.entity.StockEntity;
+
+import java.awt.*;
+import java.util.List;
 
 @Schema(description = "상품 상세 응답")
 @Getter
 @Builder
-public class ProductResponse {
+public class ProductDetailResponse {
 
     @Schema(description = "등록된 상품명", example = "MacBook Pro")
     private final String productName;
@@ -27,13 +31,20 @@ public class ProductResponse {
     @Schema(description = "등록 카테고리", example = "2")
     private final Long category;
 
-    public static ProductResponse from(ProductEntity product, StockEntity stock) {
-        return ProductResponse.builder()
+    private final List<ImageResponse> detailImages;
+
+    public static ProductDetailResponse from(ProductEntity product, StockEntity stock, List<ImageEntity> images) {
+        return ProductDetailResponse.builder()
                 .productName(product.getProductName())
                 .productPrice(product.getProductPrice())
                 .productImage(product.getProductImage())
                 .stocks(stock.getStocks())
                 .category(product.getCategory().getCategoryId())
+                .detailImages(
+                        images.stream()
+                                .map(ImageResponse::from)
+                                .toList()
+                )
                 .build();
     }
 }

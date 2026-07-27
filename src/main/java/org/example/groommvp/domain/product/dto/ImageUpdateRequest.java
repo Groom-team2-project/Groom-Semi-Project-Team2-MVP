@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ImageCreateRequest {
+public class ImageUpdateRequest {
 
     @Schema(description = "상품 이미지")
     @NotBlank(message = "상품 이미지를 등록하세요.")

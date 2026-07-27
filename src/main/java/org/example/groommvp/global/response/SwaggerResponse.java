@@ -5,7 +5,6 @@ import java.util.List;
 import org.example.groommvp.domain.cancel.dto.OrderCancelResponse;
 import org.example.groommvp.domain.order.dto.OrderResponse;
 import org.example.groommvp.domain.order.dto.PurchaseResponse;
-import org.example.groommvp.domain.product.dto.ProductCreateResponse;
 import org.example.groommvp.domain.product.dto.ProductPageResponse;
 import org.example.groommvp.domain.product.dto.ProductResponse;
 import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
@@ -27,7 +26,7 @@ public final class SwaggerResponse {
             @Schema(description = "요청 성공 여부", example = "true")
             boolean success,
             @Schema(description = "상품 등록 응답 데이터")
-            ProductCreateResponse data,
+            ProductResponse data,
             @Schema(description = "성공 응답에서는 null", nullable = true, example = "null")
             String errorCode,
             @Schema(description = "응답 메시지", nullable = true, example = "상품 등록 성공")

@@ -3,6 +3,7 @@ package org.example.groommvp.domain.product.service;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ImageCreateRequest;
 import org.example.groommvp.domain.product.dto.ImageResponse;
+import org.example.groommvp.domain.product.dto.ImageUpdateRequest;
 import org.example.groommvp.domain.product.entity.ImageEntity;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ImageRepository;
@@ -24,26 +25,42 @@ public class ImageService {
     @Transactional
     public ImageResponse saveImage(Long productId, ImageCreateRequest request) {
         ProductEntity product = productRepository.findById(productId)
-                .filter(foundProduct -> foundProduct.getDeletedAt() == null) //삭제 안된 상품은 거르기
+                .filter(found -> found.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
-        if (imageRepository.existsByProductProductId(productId)) {
-            throw new BusinessException(ErrorCode.IMAGE_ALREADY_EXISTS);
+        if (imageRepository.countByProductProductId(productId) >= 10) {
+            throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
         }
 
         ImageEntity image = ImageEntity.builder()
                 .product(product)
-                .imageUrl(request.getImageUrl())
+                .detailImage(request.getDetailImage())
                 .build();
+
+        return ImageResponse.from(imageRepository.save(image));
+    }
+
+    //이미지 수정
+    @Transactional
+    public ImageResponse updateImage(Long productId, Long imageId, ImageUpdateRequest request) {
+        //이미지 찾을 수 없을 때
+        ImageEntity image = imageRepository.findByImageIdAndProductProductId(imageId, productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
+
+        image.update(request.getDetailImage());
 
         return ImageResponse.from(imageRepository.save(image));
     }
 
     //이미지 삭제
     @Transactional
-    public void deleteImage(Long productId) {
-        ImageEntity image = imageRepository.findByProductProductId(productId)
+    public ImageResponse deleteImage(Long productId, Long imageId) {
+        //이미지 찾을 수 없을 때
+        ImageEntity image = imageRepository.findByImageIdAndProductProductId(imageId, productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
+
+        ImageResponse response = ImageResponse.from(image);
         imageRepository.delete(image);
+        return response;
     }
 }
