@@ -29,7 +29,7 @@ export function PaymentSuccessPage() {
 
     confirmPayment(orderPk, paymentKey, method)
       .then(() => {
-        toast('결제가 완료되었어요! 📧 메일을 확인해보세요.');
+        toast('결제가 완료되었어요. 확인 메일을 보냈어요.');
         navigate(`/orders/${orderPk}`, { replace: true });
       })
       .catch((e) => {

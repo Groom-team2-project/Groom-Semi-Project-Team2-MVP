@@ -5,7 +5,7 @@ import { getOrder, cancelOrder } from '../api/orders';
 import { refundPayment } from '../api/payments';
 import { ApiError } from '../api/client';
 import { requestTossPayment, type TossMethod } from '../lib/toss';
-import { formatPrice } from '../components/ProductCard';
+import { formatPrice, photoOf } from '../components/ProductCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 
@@ -91,13 +91,16 @@ export function OrderDetailPage() {
           {order.orderItems.map((item) => (
             <div className="bezel" key={item.orderItemId}>
               <div className="core row between" style={{ padding: 18 }}>
-                <div>
-                  <Link to={`/products/${item.productId}`}>
-                    <strong style={{ fontSize: 15 }}>{item.productName}</strong>
-                  </Link>
-                  <p className="text-muted" style={{ fontSize: 13 }}>
-                    {formatPrice(item.orderPrice)} × {item.quantity}개
-                  </p>
+                <div className="row" style={{ gap: 14 }}>
+                  <img className="thumb" src={photoOf(item.productId, 200)} alt="" />
+                  <div>
+                    <Link to={`/products/${item.productId}`}>
+                      <strong style={{ fontSize: 15 }}>{item.productName}</strong>
+                    </Link>
+                    <p className="text-muted" style={{ fontSize: 13 }}>
+                      {formatPrice(item.orderPrice)} × {item.quantity}개
+                    </p>
+                  </div>
                 </div>
                 <b className="price">{formatPrice(item.itemTotalPrice)}</b>
               </div>

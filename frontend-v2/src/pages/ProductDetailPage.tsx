@@ -6,7 +6,7 @@ import { getProductReviews, createReview } from '../api/reviews';
 import { addCartItem } from '../api/cart';
 import { purchase } from '../api/orders';
 import { ApiError } from '../api/client';
-import { formatPrice, initialOf } from '../components/ProductCard';
+import { formatPrice, photoOf } from '../components/ProductCard';
 import { useToast } from '../components/Toast';
 import { tokenStore } from '../lib/auth';
 
@@ -79,17 +79,8 @@ export function ProductDetailPage() {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }} className="detail-grid">
       <style>{`@media (max-width: 860px) { .detail-grid { grid-template-columns: 1fr !important; } }`}</style>
 
-      <div className="bezel rise">
-        <div
-          className="core"
-          style={{
-            aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 72, fontWeight: 900, color: 'rgba(12,12,12,0.14)',
-            background: 'linear-gradient(145deg,#f6f6f6,#ececec)'
-          }}
-        >
-          {initialOf(product.productName)}
-        </div>
+      <div className="detail-photo rise">
+        <img src={photoOf(Number(productId), 900)} alt={product.productName} />
       </div>
 
       <div className="rise rise-1">

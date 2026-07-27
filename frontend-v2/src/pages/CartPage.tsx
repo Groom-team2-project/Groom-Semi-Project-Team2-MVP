@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCart, updateCartItem, removeCartItem, checkoutCart } from '../api/cart';
 import { ApiError } from '../api/client';
-import { formatPrice } from '../components/ProductCard';
+import { formatPrice, photoOf } from '../components/ProductCard';
 import { useToast } from '../components/Toast';
 import { tokenStore } from '../lib/auth';
 
@@ -67,11 +67,14 @@ export function CartPage() {
             {items.map((item) => (
               <div className="bezel" key={item.cartItemId}>
                 <div className="core row between" style={{ padding: 18 }}>
-                  <div>
-                    <strong style={{ fontSize: 15 }}>{item.productName}</strong>
-                    <p className="text-muted" style={{ fontSize: 13 }}>
-                      {formatPrice(item.productPrice)} · 합계 <b>{formatPrice(item.lineTotal)}</b>
-                    </p>
+                  <div className="row" style={{ gap: 14 }}>
+                    <img className="thumb" src={photoOf(item.productId, 200)} alt="" />
+                    <div>
+                      <strong style={{ fontSize: 15 }}>{item.productName}</strong>
+                      <p className="text-muted" style={{ fontSize: 13 }}>
+                        {formatPrice(item.productPrice)} · 합계 <b>{formatPrice(item.lineTotal)}</b>
+                      </p>
+                    </div>
                   </div>
                   <div className="row">
                     <button

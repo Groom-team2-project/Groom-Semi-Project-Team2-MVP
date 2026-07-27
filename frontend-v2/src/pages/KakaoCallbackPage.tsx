@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { completeKakaoLogin } from '../api/auth';
+import { ApiError } from '../api/client';
 import { useToast } from '../components/Toast';
 
 export function KakaoCallbackPage() {
@@ -23,10 +24,13 @@ export function KakaoCallbackPage() {
 
     completeKakaoLogin(code, state)
       .then((res) => {
-        toast(res.newMember ? '가입을 환영해요! 🎉' : '로그인되었어요.');
+        toast(res.newMember ? '가입을 환영해요!' : '로그인되었어요.');
         navigate('/', { replace: true });
       })
-      .catch(() => setError('로그인에 실패했어요. 다시 시도해주세요.'));
+      .catch((e) =>
+        // 백엔드가 준 실제 원인을 그대로 보여줘야 디버깅이 가능하다
+        setError(e instanceof ApiError ? `${e.message} (${e.status})` : '로그인에 실패했어요. 다시 시도해주세요.')
+      );
   }, [params, navigate, toast]);
 
   return (
