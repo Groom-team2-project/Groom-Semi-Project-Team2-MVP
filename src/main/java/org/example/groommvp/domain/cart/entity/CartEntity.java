@@ -50,9 +50,16 @@ public class CartEntity extends BaseEntity {
     @JoinColumn(name = "member_id", nullable = false, unique = true)
     private MemberEntity member;
 
-    /** 장바구니 항목 목록. 장바구니 삭제 시 함께 삭제되고, 컬렉션에서 제거되면 고아 삭제된다. */
+    /**
+     * 장바구니 항목 목록. 장바구니 삭제 시 함께 삭제되고, 컬렉션에서 제거되면 고아 삭제된다.
+     *
+     * <p><b>{@code final} 을 붙이지 않는다.</b> Hibernate 는 엔티티를 로드할 때 이 필드를 자신의
+     * {@code PersistentBag} 으로 갈아끼워야 변경 추적(고아 삭제 포함)이 동작한다. final 필드는
+     * 리플렉션 주입이 JDK/Hibernate 조합에 따라 막힐 수 있어, 되는 조합에서만 우연히 동작하는
+     * 코드가 된다.
+     */
     @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, orphanRemoval = true)
-    private final List<CartItemEntity> items = new ArrayList<>();
+    private List<CartItemEntity> items = new ArrayList<>();
 
     @Builder
     public CartEntity(MemberEntity member) {

@@ -38,14 +38,18 @@ public enum ErrorCode {
     CART_ITEM_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원의 장바구니 항목에 접근할 수 없습니다."),
     CART_EMPTY(HttpStatus.BAD_REQUEST, "장바구니가 비어 있어 주문할 수 없습니다."),
     INVALID_CART_QUANTITY(HttpStatus.BAD_REQUEST, "장바구니 수량은 1 이상이어야 합니다."),
+    CART_BUSY(HttpStatus.CONFLICT, "장바구니 요청이 겹쳐 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
 
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "쿠폰을 찾을 수 없습니다."),
     COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "이미 발급받은 쿠폰입니다."),
     COUPON_ISSUE_BUSY(HttpStatus.CONFLICT, "쿠폰 발급 요청이 몰려 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
     COUPON_SOLD_OUT(HttpStatus.CONFLICT, "쿠폰이 모두 소진되었습니다."),
     COUPON_NOT_ISSUABLE(HttpStatus.BAD_REQUEST, "발급 가능한 기간이 아닙니다."),
+    INVALID_COUPON_DISCOUNT_VALUE(HttpStatus.BAD_REQUEST, "쿠폰 할인 값이 올바르지 않습니다. (정률 쿠폰은 1~100%)"),
     POINT_NOT_ENOUGH(HttpStatus.CONFLICT, "보유 포인트가 부족합니다."),
     INVALID_POINT_AMOUNT(HttpStatus.BAD_REQUEST, "포인트 금액은 1 이상이어야 합니다."),
+    POINT_ALREADY_PROCESSED(HttpStatus.CONFLICT, "이미 처리된 포인트 변동입니다."),
+    POINT_BUSY(HttpStatus.CONFLICT, "포인트 요청이 겹쳐 처리하지 못했습니다. 잠시 후 다시 시도해주세요."),
 
     MEMBER_COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "보유한 쿠폰을 찾을 수 없습니다."),
     MEMBER_COUPON_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원의 쿠폰에 접근할 수 없습니다."),

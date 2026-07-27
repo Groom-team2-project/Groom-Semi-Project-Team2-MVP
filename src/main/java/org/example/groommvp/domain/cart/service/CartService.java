@@ -1,5 +1,6 @@
 package org.example.groommvp.domain.cart.service;
 
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.cart.config.CartCacheNames;
 import org.example.groommvp.domain.cart.dto.CartItemAddRequest;
@@ -16,6 +17,7 @@ import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +64,9 @@ public class CartService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
 
         cart.addItem(product, request.quantity());
+        // 신규 항목은 cascade 로 flush 시점에 INSERT 되므로 그 전에는 cartItemId 가 null 이다.
+        // 클라이언트가 방금 담은 항목을 바로 수량 변경/삭제할 수 있도록 여기서 ID 를 확정한다.
+        cartRepository.flush();
         return CartResponse.from(cart);
     }
 
@@ -96,14 +101,44 @@ public class CartService {
                 .orElseGet(() -> CartResponse.empty(memberId));
     }
 
-    /** 회원의 장바구니를 가져오고, 없으면 생성한다. (첫 담기 시점) */
+    /**
+     * 회원의 장바구니를 가져오고, 없으면 생성한다. (첫 담기 시점)
+     *
+     * <p><b>회원 행을 잠가 이 회원의 담기를 통째로 직렬화한다.</b> 두 가지 경합을 한 번에 막는다.
+     * <ul>
+     *   <li><b>수량 병합 유실:</b> 같은 상품을 다시 담으면 {@code quantity += n} 인
+     *       read-modify-write 가 일어난다. 락이 없으면 동시 요청이 같은 수량을 읽고 각자
+     *       갱신해 담은 수량이 사라진다.</li>
+     *   <li><b>최초 생성 중복:</b> {@code carts.member_id} 는 유니크라, 동시 첫 담기가 각자
+     *       {@code save(init)} 하면 한 쪽이 제약 위반으로 실패한다.</li>
+     * </ul>
+     *
+     * <p><b>왜 장바구니 행이 아니라 회원 행을 잠그는가:</b> 장바구니는 아직 없을 수 있고,
+     * <b>존재하지 않는 행</b>을 {@code SELECT ... FOR UPDATE} 하면 InnoDB 는 레코드 락이 아니라
+     * <b>갭 락</b>을 잡는다. 갭 락끼리는 공존하지만 뒤따르는 INSERT 의 insert-intention 락과는
+     * 충돌하므로, 서로 다른 회원의 첫 담기끼리도 서로의 갭 락을 기다리며 교착한다. (32 스레드
+     * 부하에서 5% 가 {@code Deadlock found} 로 실패하는 것을 확인했다. H2 에는 갭 락이 없어
+     * 드러나지 않는다.) 회원 행은 <b>반드시 존재</b>하므로 레코드 락만 잡혀 이 문제가 없다.
+     *
+     * <p><b>순서가 중요하다.</b> 회원 락을 <b>먼저</b> 잡고 그 뒤에 장바구니를 읽어야 한다.
+     * REPEATABLE READ 의 읽기 뷰는 첫 <b>일반</b> 읽기에서 만들어지고 락 조회는 만들지 않으므로,
+     * 락을 잡은 뒤 읽으면 앞서 락을 쥐었던 트랜잭션이 커밋한 장바구니가 보인다. 반대로 읽고
+     * 나서 잠그면 낡은 스냅샷을 보고 중복 생성을 시도하게 된다.
+     */
     private CartEntity getOrCreateCart(Long memberId) {
-        return cartRepository.findByMemberIdWithItems(memberId)
-                .orElseGet(() -> {
-                    MemberEntity member = memberRepository.findById(memberId)
-                            .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-                    return cartRepository.save(CartEntity.init(member));
-                });
+        // 반드시 존재하는 회원 행을 잠근다 → 레코드 락만 잡힌다.
+        MemberEntity member = memberRepository.findByIdWithPessimisticLock(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        // 락을 잡은 뒤의 첫 일반 읽기다. 락 조회는 읽기 뷰를 만들지 않으므로 스냅샷이 지금
+        // 잡히고, 앞서 락을 쥐었던 트랜잭션이 만든 장바구니도 보인다.
+        try {
+            return cartRepository.findByMemberIdWithItems(memberId)
+                    .orElseGet(() -> cartRepository.save(CartEntity.init(member)));
+        } catch (DataIntegrityViolationException e) {
+            // 위 직렬화가 어긋나 중복 생성이 시도된 경우의 마지막 안전망.
+            throw new BusinessException(ErrorCode.CART_BUSY);
+        }
     }
 
     /** 항목을 조회하고, 요청 회원이 해당 장바구니의 소유자인지 검증한다. */
