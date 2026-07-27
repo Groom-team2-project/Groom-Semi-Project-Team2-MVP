@@ -55,7 +55,11 @@ public enum ErrorCode {
 
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
     IMAGE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "이미지는 최대 10장까지 가능합니다."),
-    
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
+    EMPTY_IMAGE_FILE(HttpStatus.BAD_REQUEST, "이미지 파일을 선택해주세요."),
+    IMAGE_FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "이미지 크기는 5MB 이하여야 합니다."),
+    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "JPG, PNG, WebP 이미지만 업로드할 수 있습니다."),
+
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
     CATEGORY_NAME_DUPLICATED(HttpStatus.CONFLICT, "중복된 카테고리명입니다."),
     INVALID_PARENT_CATEGORY(HttpStatus.CONFLICT, "중분류는 대분류에 추가할 수 있습니다."),

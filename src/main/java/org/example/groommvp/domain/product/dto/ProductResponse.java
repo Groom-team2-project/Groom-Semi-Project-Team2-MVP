@@ -27,11 +27,11 @@ public class ProductResponse {
     @Schema(description = "등록 카테고리", example = "2")
     private final Long category;
 
-    public static ProductResponse from(ProductEntity product, StockEntity stock) {
+    public static ProductResponse from(ProductEntity product, StockEntity stock, String productImageUrl) {
         return ProductResponse.builder()
                 .productName(product.getProductName())
                 .productPrice(product.getProductPrice())
-                .productImage(product.getProductImage())
+                .productImage(productImageUrl)
                 .stocks(stock.getStocks())
                 .category(product.getCategory().getCategoryId())
                 .build();

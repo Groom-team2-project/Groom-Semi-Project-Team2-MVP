@@ -36,8 +36,8 @@ public class ProductEntity extends BaseEntity {
     @Column(name = "product_price", nullable = false)
     private Integer productPrice;
 
-    @Column(name = "product_image", nullable = false)
-    private String productImage;
+    @Column(name = "product_image", nullable = false, length = 500)
+    private String productImage; //이미지 url 대신 s3 객체 키 저장
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
@@ -46,10 +46,6 @@ public class ProductEntity extends BaseEntity {
     /** 삭제된 시간 */
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-//    public ProductEntity(String productName, Integer productPrice) {
-//        this(productName, productPrice, null);
-//    }
 
     @Builder
     public ProductEntity(

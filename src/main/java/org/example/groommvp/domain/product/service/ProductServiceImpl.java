@@ -12,11 +12,13 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.example.groommvp.global.storage.S3imageStorage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 
@@ -29,11 +31,12 @@ public class ProductServiceImpl implements ProductService{
     private final StockRepository stockRepository;
     private final CategoryRepository categoryRepository;
     private final ImageRepository imageRepository;
+    private final S3imageStorage s3imageStorage;
 
     //상품 등록
     @Override
     @Transactional
-    public ProductResponse createProduct(ProductCreateRequest request) {
+    public ProductResponse createProduct(ProductCreateRequest request, MultipartFile productImage) {
         //카테고리 확인
         CategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
@@ -41,27 +44,38 @@ public class ProductServiceImpl implements ProductService{
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_CATEGORY);
         }
 
-        ProductEntity product = ProductEntity.builder()
-                .productName(request.getProductName())
-                .productPrice(request.getProductPrice())
-                .productImage(request.getProductImage())
-                .category(category)
-                .build();
-        ProductEntity savedProduct =  productRepository.save(product);
+        String productImageKey = s3imageStorage.upload(productImage, "products/main");
 
-        StockEntity stock = StockEntity.builder()
-                .product(savedProduct)
-                .stocks(request.getStocks())
-                .build();
-        stockRepository.save(stock);
+        try {
+            ProductEntity product = ProductEntity.builder()
+                    .productName(request.getProductName())
+                    .productPrice(request.getProductPrice())
+                    .productImage(productImageKey)
+                    .category(category)
+                    .build();
+            ProductEntity savedProduct =  productRepository.save(product);
 
-        return ProductResponse.from(product, stock);
+            StockEntity stock = StockEntity.builder()
+                    .product(savedProduct)
+                    .stocks(request.getStocks())
+                    .build();
+            stockRepository.save(stock);
+
+            return ProductResponse.from(
+                    savedProduct,
+                    stock,
+                    s3imageStorage.toUrl(productImageKey)
+            );
+        }catch (RuntimeException exception) {
+            s3imageStorage.delete(productImageKey);
+            throw exception;
+        }
     }
 
     //상품 수정
     @Override
     @Transactional
-    public ProductResponse updateProduct(Long productId, ProductUpdateRequest request) {
+    public ProductResponse updateProduct(Long productId, ProductUpdateRequest request, MultipartFile productImage) {
 
         ProductEntity product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)); //등록되지 않은 상품
@@ -78,14 +92,44 @@ public class ProductServiceImpl implements ProductService{
         StockEntity stock = stockRepository.findByProduct_ProductId(productId)
                         .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
 
-        product.update(
-                request.getProductName(),
-                request.getProductPrice(),
-                request.getImageUrl(),
-                category
-        );
+        String oldImageKey = product.getProductImage();
+        String newImageKey = oldImageKey;
+        boolean imageChanged = false;
 
-        return ProductResponse.from(product, stock);
+        if (productImage != null && !productImage.isEmpty()) {
+            newImageKey = s3imageStorage.upload(
+                    productImage,
+                    "products/main"
+            );
+            imageChanged = true;
+        }
+
+        try {
+            product.update(
+                    request.getProductName(),
+                    request.getProductPrice(),
+                    newImageKey,
+                    category
+            );
+
+            productRepository.saveAndFlush(product);
+        } catch (RuntimeException exception) {
+            if (imageChanged) {
+                s3imageStorage.delete(newImageKey);
+            }
+
+            throw exception;
+        }
+
+        if (imageChanged) {
+            s3imageStorage.delete(oldImageKey);
+        }
+
+        return ProductResponse.from(
+                product,
+                stock,
+                s3imageStorage.toUrl(newImageKey)
+        );
     }
 
     //상품 삭제
@@ -103,8 +147,8 @@ public class ProductServiceImpl implements ProductService{
         if (stock.getStocks() > 0) {
             throw new BusinessException(ErrorCode.PRODUCT_STOCK_REMAINING);
         }
-        ProductResponse response = ProductResponse.from(product, stock);
-        productRepository.delete(product);
+        ProductResponse response = ProductResponse.from(product, stock, s3imageStorage.toUrl(product.getProductImage()));
+        product.delete();
 
         return response;
     }
@@ -123,7 +167,13 @@ public class ProductServiceImpl implements ProductService{
         List<ImageEntity> images = imageRepository
                 .findAllByProductProductIdOrderByImageIdAsc(productId);
 
-        return ProductDetailResponse.from(product, stock, images);
+        List<ImageResponse> detailImages = images.stream()
+                .map(image -> ImageResponse.from(image, s3imageStorage.toUrl(image.getDetailImage())))
+                .toList();
+
+        String productImageUrl = s3imageStorage.toUrl(product.getProductImage());
+
+        return ProductDetailResponse.from(product, stock, productImageUrl, detailImages);
     }
 
     @Override
