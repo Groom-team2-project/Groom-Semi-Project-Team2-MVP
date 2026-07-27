@@ -82,6 +82,43 @@ function formatPrice(price?: number) {
   return price === undefined ? '가격 확인' : `${price.toLocaleString()}원`;
 }
 
+// 서버는 ISO-8601 LocalDateTime(타임존 없음)을 보낸다. 파싱 실패 시 원본을 그대로 보여준다.
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '-';
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+// 주문 상태 코드를 사람이 읽는 문구로. 모르는 코드는 코드 그대로 노출한다.
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: '결제 대기',
+  COMPLETED: '구매 완료',
+  CANCELED: '취소됨',
+  PAYMENT_FAILED: '결제 실패'
+};
+
+function orderStatusLabel(status?: string) {
+  if (!status) {
+    return '상태 미상';
+  }
+  return ORDER_STATUS_LABELS[status] ?? status;
+}
+
+// 상태별 배지 색을 CSS 로 넘기기 위한 modifier 클래스.
+function orderStatusClass(status?: string) {
+  switch (status) {
+    case 'COMPLETED':
+      return 'order-status is-done';
+    case 'CANCELED':
+    case 'PAYMENT_FAILED':
+      return 'order-status is-dead';
+    default:
+      return 'order-status is-pending';
+  }
+}
+
 function productInitial(product?: Product | null) {
   return product?.productName?.slice(0, 2).toUpperCase() ?? 'SO';
 }
@@ -197,6 +234,8 @@ export default function App() {
   const [mEmail, setMEmail] = useState('');
   const [mNick, setMNick] = useState('');
   const [cart, setCart] = useState<CartView | null>(null);
+  // 마이페이지 주문 내역. null = 아직 조회 안 함, [] = 조회했는데 주문 없음.
+  const [myOrders, setMyOrders] = useState<OrderDetail[] | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState('인기 상품을 둘러보고 바로 구매해보세요.');
   const [isLoading, setIsLoading] = useState(false);
@@ -652,6 +691,16 @@ export default function App() {
     if (res.ok) {
       // 주문 전환 후 장바구니는 비워진다.
       setCart({ cartId: null, items: [], totalQuantity: 0, totalPrice: 0 });
+      // 방금 만든 주문이 곧바로 내역에 보이도록 갱신한다.
+      await getMyOrders();
+    }
+  }
+
+  // ===== E 파트: 주문 내역 =====
+  async function getMyOrders() {
+    const res = await run('내 주문 내역', 'GET', '/api/v1/members/me/orders', undefined, true);
+    if (res.ok) {
+      setMyOrders(unwrapData<OrderDetail[]>(res) ?? []);
     }
   }
 
@@ -1319,6 +1368,64 @@ export default function App() {
                   <div className="empty-state">장바구니가 비어 있습니다.</div>
                 ) : (
                   <p className="hint">「조회」를 누르면 담긴 상품이 여기에 표시됩니다.</p>
+                )}
+              </article>
+
+              <article className="admin-card span-2">
+                <div className="card-heading">
+                  <div>
+                    <p className="eyebrow">Orders</p>
+                    <h2>주문 내역</h2>
+                  </div>
+                  <button type="button" onClick={getMyOrders} disabled={isLoading}>조회</button>
+                </div>
+
+                {myOrders === null ? (
+                  <p className="hint">「조회」를 누르면 주문 내역이 최신순으로 표시됩니다.</p>
+                ) : myOrders.length === 0 ? (
+                  <div className="empty-state">아직 주문 내역이 없습니다.</div>
+                ) : (
+                  <div className="order-history">
+                    {myOrders.map((order) => (
+                      <div className="order-history-entry" key={order.orderId}>
+                        <div className="order-history-head">
+                          <div>
+                            <strong>주문 #{order.orderId ?? '-'}</strong>
+                            <span>{formatDateTime(order.createdAt)}</span>
+                          </div>
+                          <span className={orderStatusClass(order.status)}>
+                            {orderStatusLabel(order.status)}
+                          </span>
+                        </div>
+
+                        <div className="order-items">
+                          {(order.orderItems ?? []).map((item, index) => (
+                            <div className="order-item-row" key={`${order.orderId}-${item.orderItemId ?? index}`}>
+                              <div className="mini-visual">
+                                {(item.productName ?? 'SO').slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <strong>{item.productName ?? `상품 #${item.productId ?? '-'}`}</strong>
+                                <span>수량 {item.quantity ?? '-'}개 · 단가 {formatPrice(item.orderPrice)}</span>
+                              </div>
+                              <p>{formatPrice(item.itemTotalPrice)}</p>
+                            </div>
+                          ))}
+                          {(order.orderItems?.length ?? 0) === 0 && (
+                            <div className="empty-state">주문 상품 정보가 없습니다.</div>
+                          )}
+                        </div>
+
+                        <div className="order-history-foot">
+                          <span>주문 금액</span>
+                          <strong>{formatPrice(order.totalPrice)}</strong>
+                          {order.canceledAt && (
+                            <span className="hint">취소 {formatDateTime(order.canceledAt)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </article>
 

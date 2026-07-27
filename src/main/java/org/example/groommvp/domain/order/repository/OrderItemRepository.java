@@ -1,5 +1,6 @@
 package org.example.groommvp.domain.order.repository;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.example.groommvp.domain.order.entity.Order;
@@ -14,4 +15,12 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
 
     @Query("select oi from OrderItem oi join fetch oi.product where oi.order.id = :orderId")
     List<OrderItem> findByOrderIdWithProduct(@Param("orderId") Long orderId);
+
+    /**
+     * 여러 주문의 항목을 한 번에 조회한다. (주문 목록 조회의 N+1 방지)
+     *
+     * <p>주문마다 {@link #findByOrderIdWithProduct} 를 부르면 주문 수만큼 쿼리가 나간다.
+     */
+    @Query("select oi from OrderItem oi join fetch oi.product where oi.order.id in :orderIds")
+    List<OrderItem> findByOrderIdsWithProduct(@Param("orderIds") Collection<Long> orderIds);
 }

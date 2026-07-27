@@ -20,6 +20,19 @@ redis:
     host: ${REDIS_HOST}
     port: ${REDIS_PORT}
 
+cart:
+    reservation:
+        expiry:
+            # 미결제 주문의 예약 재고 회수. 결제창을 닫아버린 주문이 재고를 영구히
+            # 잠식하는 것을 막는다. 여러 인스턴스로 배포하면 한 대만 켜는 편이 낫다.
+            enabled: ${CART_RESERVATION_EXPIRY_ENABLED:true}
+            # 이 시간이 지나도록 결제되지 않으면 예약을 푼다. (결제 제한시간보다 넉넉해야 한다)
+            timeout: ${CART_RESERVATION_EXPIRY_TIMEOUT:PT30M}
+            # 회수 작업 실행 주기
+            interval: ${CART_RESERVATION_EXPIRY_INTERVAL:PT1M}
+            # 한 주기에 처리할 최대 주문 수
+            batch-size: ${CART_RESERVATION_EXPIRY_BATCH_SIZE:100}
+
 springdoc:
     swagger-ui:
         path: /swagger-ui.html

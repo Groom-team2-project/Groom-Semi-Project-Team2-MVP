@@ -648,6 +648,84 @@ h3 {
   background: #fbf4e8;
 }
 
+/* ===== 마이페이지 주문 내역 ===== */
+
+.order-history {
+  display: grid;
+  gap: 14px;
+}
+
+.order-history-entry {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #e6dccc;
+  border-radius: 11px;
+  padding: 14px;
+  background: #fffdf8;
+}
+
+.order-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-history-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.order-history-head strong {
+  font-weight: 1000;
+}
+
+.order-history-head span {
+  color: #5f6d76;
+  font-weight: 800;
+}
+
+.order-status {
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-weight: 900;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.order-status.is-done {
+  background: #e6f4ea;
+  color: #1e6b3a;
+}
+
+.order-status.is-pending {
+  background: #fdf1dc;
+  color: #8a5b12;
+}
+
+.order-status.is-dead {
+  background: #f6e7e7;
+  color: #8c2f2f;
+}
+
+.order-history-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-top: 1px solid #eee4d5;
+  padding-top: 10px;
+}
+
+.order-history-foot span {
+  color: #5f6d76;
+  font-weight: 800;
+}
+
+.order-history-foot strong {
+  font-weight: 1000;
+  margin-right: auto;
+}
+
 .selected-item div:last-child {
   display: grid;
   gap: 4px;
@@ -923,5 +1001,15 @@ h3 {
 
   .span-2 {
     grid-column: auto;
+  }
+
+  /* 좁은 화면에서는 주문번호와 상태 배지를 줄바꿈해 겹치지 않게 한다. */
+  .order-history-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .order-history-foot {
+    flex-wrap: wrap;
   }
 }

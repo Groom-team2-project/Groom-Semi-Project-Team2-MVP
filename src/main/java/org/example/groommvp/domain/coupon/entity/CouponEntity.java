@@ -84,6 +84,9 @@ public class CouponEntity extends BaseEntity {
     private CouponEntity(String couponName, DiscountType discountType, int discountValue,
                          Integer maxDiscountAmount, int minOrderAmount, int totalQuantity,
                          LocalDateTime issueStartAt, LocalDateTime issueEndAt, int validDays) {
+        // 할인 값 유효 범위는 방식마다 다르다. (정률은 1~100%) 생성자에서 막아야 어떤
+        // 경로로 만들어도 "전액 할인" 같은 쿠폰이 저장되지 않는다.
+        discountType.validateDiscountValue(discountValue);
         this.couponName = couponName;
         this.discountType = discountType;
         this.discountValue = discountValue;

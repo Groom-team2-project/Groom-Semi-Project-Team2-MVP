@@ -30,6 +30,53 @@ class CouponEntityTest {
     }
 
     @Nested
+    @DisplayName("할인 값 검증")
+    class ValidateDiscountValue {
+
+        @Test
+        @DisplayName("정률 쿠폰의 할인율이 100%를 넘으면 생성할 수 없다 (전액 할인 방지)")
+        void rate_rejectsRateAbove100() {
+            assertThatThrownBy(() -> baseCoupon()
+                    .discountType(DiscountType.RATE)
+                    .discountValue(1000)
+                    .maxDiscountAmount(null)
+                    .build())
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_COUPON_DISCOUNT_VALUE);
+        }
+
+        @Test
+        @DisplayName("정률 100%는 허용된다 (경계값)")
+        void rate_allowsExactly100() {
+            CouponEntity coupon = baseCoupon()
+                    .discountType(DiscountType.RATE)
+                    .discountValue(100)
+                    .build();
+
+            assertThat(coupon.calculateDiscount(10_000L)).isEqualTo(10_000L);
+        }
+
+        @Test
+        @DisplayName("할인 값이 0 이하면 방식에 관계없이 생성할 수 없다")
+        void rejectsNonPositiveDiscountValue() {
+            assertThatThrownBy(() -> baseCoupon().discountValue(0).build())
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_COUPON_DISCOUNT_VALUE);
+        }
+
+        @Test
+        @DisplayName("정액 쿠폰은 100원을 넘는 금액도 허용된다 (정률 상한과 무관)")
+        void fixed_allowsAmountAbove100() {
+            CouponEntity coupon = baseCoupon()
+                    .discountType(DiscountType.FIXED)
+                    .discountValue(50_000)
+                    .build();
+
+            assertThat(coupon.getDiscountValue()).isEqualTo(50_000);
+        }
+    }
+
+    @Nested
     @DisplayName("할인 계산")
     class CalculateDiscount {
 

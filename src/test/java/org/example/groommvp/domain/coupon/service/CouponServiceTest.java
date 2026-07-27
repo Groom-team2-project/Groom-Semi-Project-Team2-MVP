@@ -166,7 +166,7 @@ class CouponServiceTest {
         void useCoupon_returnsDiscount() {
             MemberCouponEntity memberCoupon =
                     MemberCouponEntity.issue(member(MEMBER_ID), coupon(10), LocalDateTime.now());
-            given(memberCouponRepository.findByIdWithCoupon(10L)).willReturn(Optional.of(memberCoupon));
+            given(memberCouponRepository.findByIdWithPessimisticLock(10L)).willReturn(Optional.of(memberCoupon));
 
             long discount = couponService.useCoupon(MEMBER_ID, 10L, 10_000L, 42L);
 
@@ -179,7 +179,7 @@ class CouponServiceTest {
         void useCoupon_throwsForOtherMembersCoupon() {
             MemberCouponEntity memberCoupon =
                     MemberCouponEntity.issue(member(MEMBER_ID), coupon(10), LocalDateTime.now());
-            given(memberCouponRepository.findByIdWithCoupon(10L)).willReturn(Optional.of(memberCoupon));
+            given(memberCouponRepository.findByIdWithPessimisticLock(10L)).willReturn(Optional.of(memberCoupon));
 
             assertThatThrownBy(() -> couponService.useCoupon(OTHER_MEMBER_ID, 10L, 10_000L, 42L))
                     .isInstanceOf(BusinessException.class)
@@ -194,11 +194,66 @@ class CouponServiceTest {
             MemberCouponEntity memberCoupon =
                     MemberCouponEntity.issue(member(MEMBER_ID), coupon(10), LocalDateTime.now());
             memberCoupon.use(10_000L, 42L, LocalDateTime.now());
-            given(memberCouponRepository.findByIdWithCoupon(10L)).willReturn(Optional.of(memberCoupon));
+            given(memberCouponRepository.findByIdWithPessimisticLock(10L)).willReturn(Optional.of(memberCoupon));
 
             assertThatThrownBy(() -> couponService.useCoupon(MEMBER_ID, 10L, 10_000L, 43L))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_USED);
+        }
+    }
+
+    @Nested
+    @DisplayName("사용 취소")
+    class CancelCouponUse {
+
+        @Test
+        @DisplayName("사용된 주문을 취소하면 쿠폰이 다시 사용 가능해진다")
+        void cancelCouponUse_restoresCoupon() {
+            MemberCouponEntity memberCoupon =
+                    MemberCouponEntity.issue(member(MEMBER_ID), coupon(10), LocalDateTime.now());
+            memberCoupon.use(10_000L, 42L, LocalDateTime.now());
+            given(memberCouponRepository.findByIdWithPessimisticLock(10L)).willReturn(Optional.of(memberCoupon));
+
+            couponService.cancelCouponUse(MEMBER_ID, 10L, 42L);
+
+            assertThat(memberCoupon.isUsed()).isFalse();
+        }
+
+        @Test
+        @DisplayName("다른 주문의 취소는 이 쿠폰의 사용을 되돌리지 않는다 (주문 격리)")
+        void cancelCouponUse_ignoresOtherOrder() {
+            MemberCouponEntity memberCoupon =
+                    MemberCouponEntity.issue(member(MEMBER_ID), coupon(10), LocalDateTime.now());
+            memberCoupon.use(10_000L, 42L, LocalDateTime.now());
+            given(memberCouponRepository.findByIdWithPessimisticLock(10L)).willReturn(Optional.of(memberCoupon));
+
+            couponService.cancelCouponUse(MEMBER_ID, 10L, 99L);
+
+            assertThat(memberCoupon.isUsed()).isTrue();
+            assertThat(memberCoupon.getUsedOrderId()).isEqualTo(42L);
+        }
+
+        @Test
+        @DisplayName("주문 ID 없이는 취소할 수 없다")
+        void cancelCouponUse_requiresOrderId() {
+            assertThatThrownBy(() -> couponService.cancelCouponUse(MEMBER_ID, 10L, null))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        @Test
+        @DisplayName("남의 쿠폰은 취소할 수 없다")
+        void cancelCouponUse_throwsForOtherMembersCoupon() {
+            MemberCouponEntity memberCoupon =
+                    MemberCouponEntity.issue(member(MEMBER_ID), coupon(10), LocalDateTime.now());
+            memberCoupon.use(10_000L, 42L, LocalDateTime.now());
+            given(memberCouponRepository.findByIdWithPessimisticLock(10L)).willReturn(Optional.of(memberCoupon));
+
+            assertThatThrownBy(() -> couponService.cancelCouponUse(OTHER_MEMBER_ID, 10L, 42L))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_COUPON_FORBIDDEN);
+
+            assertThat(memberCoupon.isUsed()).isTrue();
         }
     }
 }
