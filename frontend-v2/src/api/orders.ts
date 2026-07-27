@@ -1,0 +1,19 @@
+import { api } from './client';
+import type { OrderResponse, PurchaseResponse } from './types';
+
+// 단건 바로구매 — 주문을 PENDING_PAYMENT로 생성하고 재고를 예약한다
+export function purchase(productId: number, quantity: number) {
+  return api<PurchaseResponse>(`/api/v1/products/${productId}/orders`, {
+    method: 'POST',
+    body: { quantity },
+    auth: true
+  });
+}
+
+export function getOrder(orderId: number | string) {
+  return api<OrderResponse>(`/api/v1/orders/${orderId}`, { auth: true });
+}
+
+export function cancelOrder(orderId: number | string) {
+  return api<unknown>(`/api/v1/orders/${orderId}/cancel`, { method: 'POST', auth: true });
+}

@@ -108,3 +108,9 @@ frontend/.vite/
 frontend/.env
 frontend/.env.*
 frontend/*.tsbuildinfo
+
+# frontend-v2
+frontend-v2/node_modules/
+frontend-v2/dist/
+frontend-v2/.vite/
+frontend-v2/*.tsbuildinfo
