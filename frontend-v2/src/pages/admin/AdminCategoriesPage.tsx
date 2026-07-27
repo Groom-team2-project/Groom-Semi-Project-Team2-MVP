@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getCategories, createCategory, createChildCategory, updateCategory, deleteCategory } from '../../api/categories';
+import { getCategoryTree, createCategory, createChildCategory, updateCategory, deleteCategory } from '../../api/categories';
 import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { AdminShell } from './AdminLayout';
@@ -14,7 +14,7 @@ export function AdminCategoriesPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
 
-  const { data: categories, isLoading } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
+  const { data: categories, isLoading } = useQuery({ queryKey: ['categories'], queryFn: getCategoryTree });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['categories'] });
   const onError = (e: unknown, fallback: string) =>

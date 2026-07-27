@@ -63,6 +63,14 @@ export type CategoryResponse = {
   parentCategory: number | null;
 };
 
+// GET /categories/{id} — 대분류면 children이 중분류 목록, 중분류면 상품 목록
+export type CategoryDetailResponse = {
+  categoryId: number;
+  categoryName: string;
+  parentCategory: number | null;
+  children: { categoryId?: number; categoryName?: string }[];
+};
+
 // ---------- cart ----------
 export type CartItemResponse = {
   cartItemId: number;

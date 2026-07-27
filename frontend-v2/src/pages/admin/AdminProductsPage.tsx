@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../../api/products';
-import { getCategories } from '../../api/categories';
+import { getCategoryTree } from '../../api/categories';
 import { ApiError } from '../../api/client';
 import { formatPrice } from '../../components/ProductCard';
 import { useToast } from '../../components/Toast';
@@ -28,7 +28,7 @@ export function AdminProductsPage() {
     queryKey: ['admin-products', page],
     queryFn: () => getProducts({ page, size: 10 })
   });
-  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategories });
+  const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: getCategoryTree });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-products'] });
