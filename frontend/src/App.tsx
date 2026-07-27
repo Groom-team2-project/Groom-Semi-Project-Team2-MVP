@@ -25,19 +25,9 @@ type LoginResponse = {
   tokenType: string;
   accessToken: string;
   expiresIn: number;
-  refreshToken?: string;
-  refreshTokenExpiresIn?: number;
   memberId: number;
   role: string;
   newMember: boolean;
-};
-
-type TokenReissueResponse = {
-  tokenType: string;
-  accessToken: string;
-  expiresIn: number;
-  refreshToken: string;
-  refreshTokenExpiresIn: number;
 };
 
 type MemberProfile = {
@@ -90,7 +80,6 @@ type LoadOrderOptions = {
 };
 
 const TOKEN_KEY = 'soldout_access_token';
-const REFRESH_TOKEN_KEY = 'soldout_refresh_token';
 const STATE_KEY = 'soldout_oauth_state';
 const PRODUCT_CACHE_KEY = 'soldout_products_cache';
 const ORDER_HISTORY_KEY = 'soldout_order_history';
@@ -106,6 +95,43 @@ function getNested<T = unknown>(value: unknown, key: string): T | undefined {
 
 function formatPrice(price?: number) {
   return price === undefined ? '가격 확인' : `${price.toLocaleString()}원`;
+}
+
+// 서버는 ISO-8601 LocalDateTime(타임존 없음)을 보낸다. 파싱 실패 시 원본을 그대로 보여준다.
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '-';
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+// 주문 상태 코드를 사람이 읽는 문구로. 모르는 코드는 코드 그대로 노출한다.
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: '결제 대기',
+  COMPLETED: '구매 완료',
+  CANCELED: '취소됨',
+  PAYMENT_FAILED: '결제 실패'
+};
+
+function orderStatusLabel(status?: string) {
+  if (!status) {
+    return '상태 미상';
+  }
+  return ORDER_STATUS_LABELS[status] ?? status;
+}
+
+// 상태별 배지 색을 CSS 로 넘기기 위한 modifier 클래스.
+function orderStatusClass(status?: string) {
+  switch (status) {
+    case 'COMPLETED':
+      return 'order-status is-done';
+    case 'CANCELED':
+    case 'PAYMENT_FAILED':
+      return 'order-status is-dead';
+    default:
+      return 'order-status is-pending';
+  }
 }
 
 function productInitial(product?: Product | null) {
@@ -234,7 +260,6 @@ export default function App() {
   const [routePath, setRoutePath] = useState(window.location.pathname);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) ?? '');
   const activeTokenRef = useRef(token);
-  const activeRefreshTokenRef = useRef(localStorage.getItem(REFRESH_TOKEN_KEY) ?? '');
   const [state, setState] = useState(() => localStorage.getItem(STATE_KEY) ?? '');
   const [code, setCode] = useState('');
   const [member, setMember] = useState<MemberProfile | null>(null);
@@ -277,6 +302,8 @@ export default function App() {
   const [mEmail, setMEmail] = useState('');
   const [mNick, setMNick] = useState('');
   const [cart, setCart] = useState<CartView | null>(null);
+  // 마이페이지 주문 내역. null = 아직 조회 안 함, [] = 조회했는데 주문 없음.
+  const [myOrders, setMyOrders] = useState<OrderDetail[] | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [notice, setNotice] = useState('인기 상품을 둘러보고 바로 구매해보세요.');
   const [isLoading, setIsLoading] = useState(false);
@@ -287,7 +314,6 @@ export default function App() {
   const isOrderPage = routePath.startsWith('/orders/');
   const isPaymentSuccess = routePath === '/payment/success';
   const isPaymentFail = routePath === '/payment/fail';
-  const isMyPage = routePath === '/my';
   const checkoutProductId = isCheckout ? routePath.split('/')[2] : '';
   const routeOrderId = isOrderPage ? routePath.split('/')[2] : '';
   const visibleProducts = products;
@@ -308,6 +334,18 @@ export default function App() {
   useEffect(() => {
     setOrderHistory(readOrderHistory(currentMemberId));
   }, [currentMemberId]);
+
+  // 마이페이지에 들어오면 장바구니와 주문 내역을 서버에서 바로 불러온다.
+  // (로컬에 쌓아둔 orderHistory 와 달리 서버가 원본이라 기기가 달라도 같게 보인다)
+  useEffect(() => {
+    if (!isOrderHistoryPage || !token) {
+      return;
+    }
+    void getCart();
+    void getMyOrders();
+    // 진입 시 1회. 이후 갱신은 각 패널의 버튼으로 한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOrderHistoryPage, token]);
 
   useEffect(() => {
     const handlePopState = () => setRoutePath(window.location.pathname);
@@ -359,64 +397,31 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function resetAccountState() {
-    setMember(null);
-    setOrderHistory([]);
-    setOrderDetail(null);
-    setOrderId('');
-    setCart(null);
-  }
-
-  function saveToken(nextToken: string, nextRefreshToken?: string) {
-    const currentAccountId = decodeJwtMemberId(activeTokenRef.current);
-    const nextAccountId = decodeJwtMemberId(nextToken);
-    const isAccountChanged =
-      activeTokenRef.current !== nextToken
-      && (currentAccountId !== nextAccountId || !currentAccountId || !nextAccountId);
-
-    if (isAccountChanged) {
-      resetAccountState();
+  function saveToken(nextToken: string) {
+    if (activeTokenRef.current !== nextToken) {
+      setMember(null);
+      setOrderHistory([]);
+      setOrderDetail(null);
+      setOrderId('');
+      setCart(null);
     }
 
     activeTokenRef.current = nextToken;
     setToken(nextToken);
     localStorage.setItem(TOKEN_KEY, nextToken);
-
-    if (nextRefreshToken) {
-      activeRefreshTokenRef.current = nextRefreshToken;
-      localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
-    } else {
-      activeRefreshTokenRef.current = '';
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
-    }
   }
 
-  function clearLocalSession(message = '로그아웃되었습니다.') {
+  function clearSession() {
     activeTokenRef.current = '';
-    activeRefreshTokenRef.current = '';
     setToken('');
-    resetAccountState();
+    setMember(null);
+    setOrderHistory([]);
+    setOrderDetail(null);
+    setOrderId('');
     localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    setNotice(message);
+    setNotice('로그아웃되었습니다.');
   }
 
-  async function clearSession() {
-    const refreshToken = activeRefreshTokenRef.current;
-
-    if (refreshToken) {
-      try {
-        await apiRequest('/api/v1/auth/logout', {
-          method: 'POST',
-          body: { refreshToken }
-        });
-      } catch {
-        // 로컬 세션 정리는 계속 진행한다.
-      }
-    }
-
-    clearLocalSession();
-  }
   function rememberOrder(order: OrderDetail, ownerMemberId?: number) {
     if (!order.orderId || !ownerMemberId) {
       return;
@@ -432,27 +437,6 @@ export default function App() {
     });
   }
 
-  async function reissueAccessToken() {
-    const refreshToken = activeRefreshTokenRef.current;
-    if (!refreshToken) {
-      return null;
-    }
-
-    const result = await apiRequest<TokenReissueResponse>('/api/v1/auth/reissue', {
-      method: 'POST',
-      body: { refreshToken }
-    });
-    const data = unwrapData<TokenReissueResponse>(result);
-
-    if (!result.ok || !data?.accessToken || !data.refreshToken) {
-      clearLocalSession('로그인이 만료되었습니다. 다시 로그인해주세요.');
-      return null;
-    }
-
-    saveToken(data.accessToken, data.refreshToken);
-    return data.accessToken;
-  }
-
   async function run<T = unknown>(
     label: string,
     method: string,
@@ -464,25 +448,11 @@ export default function App() {
     setIsLoading(true);
     const startedAt = performance.now();
     try {
-      let requestToken = tokenOverride ?? (withToken ? activeTokenRef.current : undefined);
-      let result = await apiRequest<T>(path, {
+      const result = await apiRequest<T>(path, {
         method,
         body,
-        token: requestToken
+        token: tokenOverride ?? (withToken ? token : undefined)
       });
-
-      const canReissue = withToken || tokenOverride === activeTokenRef.current;
-      if (canReissue && result.status === 401 && !path.startsWith('/api/v1/auth/')) {
-        const reissuedToken = await reissueAccessToken();
-        if (reissuedToken) {
-          requestToken = reissuedToken;
-          result = await apiRequest<T>(path, {
-            method,
-            body,
-            token: requestToken
-          });
-        }
-      }
 
       setLogs((prev) => [
         {
@@ -546,7 +516,7 @@ export default function App() {
     }
 
     if (data?.url) {
-      window.location.assign(data.url);
+      window.open(data.url, '_blank', 'noopener,noreferrer');
     }
   }
 
@@ -559,7 +529,7 @@ export default function App() {
     const data = unwrapData<LoginResponse>(result);
 
     if (data?.accessToken) {
-      saveToken(data.accessToken, data.refreshToken);
+      saveToken(data.accessToken);
       await loadMe(data.accessToken);
       setNotice('로그인되었습니다.');
     }
@@ -861,10 +831,37 @@ export default function App() {
       const nextOrderId = getNested<number>(data, 'orderId');
       setCart({ cartId: null, items: [], totalQuantity: 0, totalPrice: 0 });
       if (nextOrderId) {
+        // 체크아웃 후에는 결제 흐름을 이어가도록 주문 상세로 이동한다.
         setOrderId(String(nextOrderId));
         await loadOrder(String(nextOrderId), { remember: true, ownerMemberId: currentMemberId });
         navigate(`/orders/${nextOrderId}`);
       }
+    }
+  }
+
+  // 마이페이지에서 항목 ID를 직접 입력하지 않고 버튼으로 수량을 조절한다.
+  async function changeCartItemQuantity(item: CartItemView, delta: number) {
+    const next = (item.quantity ?? 1) + delta;
+    if (!item.cartItemId || next < 1) {
+      return;
+    }
+    applyCart(await run('장바구니 수량변경', 'PATCH', `/api/v1/carts/items/${item.cartItemId}`,
+      { quantity: next }, true));
+  }
+
+  async function removeCartItemById(id?: number) {
+    if (!id) {
+      return;
+    }
+    applyCart(await run('장바구니 항목삭제', 'DELETE', `/api/v1/carts/items/${id}`, undefined, true));
+  }
+
+  // ===== E 파트: 주문 내역 (서버 조회) =====
+  // 로컬에 쌓는 orderHistory 와 달리 서버가 원본이라, 기기·브라우저가 달라도 동일하게 보인다.
+  async function getMyOrders() {
+    const res = await run('내 주문 내역', 'GET', '/api/v1/members/me/orders', undefined, true);
+    if (res.ok) {
+      setMyOrders(unwrapData<OrderDetail[]>(res) ?? []);
     }
   }
   // ===== E 파트: 쿠폰 =====
@@ -903,7 +900,8 @@ export default function App() {
   // 스토어에서 특정 상품을 장바구니에 담는다. (로그인 필요)
   async function addProductToCart(product: Product, qty = 1) {
     if (!token) {
-      setNotice('로그인이 필요합니다. 마이페이지에서 토큰을 발급하세요.');
+      // 담기는 인증이 필요하다. 어디로 가야 할지 알 수 있도록 안내한다.
+      setNotice('로그인이 필요합니다. 마이페이지에서 카카오 로그인하거나, 로컬 테스트라면 Admin 페이지에서 dev 토큰을 발급하세요.');
       return;
     }
     if (!product.productId) {
@@ -1210,41 +1208,170 @@ export default function App() {
               )}
               <button type="button" onClick={() => navigate('/')}>쇼핑 계속하기</button>
             </div>
-          </article>
 
-          <article className="my-orders-panel">
-            <div className="section-heading compact">
-              <div>
-                <p className="eyebrow">Orders</p>
-                <h2>최근 주문</h2>
+            {token ? (
+              <div className="admin-form">
+                <label>이메일<input value={mEmail} onChange={(event) => setMEmail(event.target.value)} placeholder="new@example.com" /></label>
+                <label>닉네임<input value={mNick} onChange={(event) => setMNick(event.target.value)} placeholder="새 닉네임" /></label>
+                <button type="button" onClick={updateMe} disabled={isLoading}>프로필 수정</button>
               </div>
-            </div>
-
-            {orderHistory.length === 0 ? (
-              <div className="empty-state">표시할 주문이 없습니다.</div>
             ) : (
-              <div className="my-order-list">
-                {orderHistory.map((order) => (
-                  <button
-                    type="button"
-                    className="my-order-row"
-                    key={order.orderId}
-                    onClick={() => {
-                      if (order.orderId) {
-                        void loadOrder(String(order.orderId));
-                        navigate(`/orders/${order.orderId}`);
-                      }
-                    }}
-                  >
-                    <span>#{order.orderId}</span>
-                    <strong>{order.status ?? '-'}</strong>
-                    <span>{formatPrice(order.totalPrice)}</span>
-                    <small>{order.createdAt ?? '-'}</small>
-                  </button>
-                ))}
-              </div>
+              // 테스트용 토큰 발급기는 /admin 에만 둔다. (배포 전 제거 대상을 한 곳에 모아두기 위함)
+              <p className="hint">
+                카카오 로그인을 하거나, 로컬 테스트라면 <a href="/admin">Admin</a> 페이지에서 dev 토큰을 발급하세요.
+              </p>
             )}
           </article>
+
+          <div className="mypage-main">
+            <article className="my-orders-panel">
+              <div className="section-heading compact">
+                <div>
+                  <p className="eyebrow">Cart</p>
+                  <h2>장바구니</h2>
+                </div>
+                <button type="button" onClick={getCart} disabled={!token || isLoading}>새로고침</button>
+              </div>
+
+              {!token ? (
+                <div className="empty-state">로그인하면 장바구니를 볼 수 있습니다.</div>
+              ) : cart && (cart.items?.length ?? 0) > 0 ? (
+                <>
+                  <div className="order-items">
+                    {cart.items!.map((item, index) => (
+                      <div className="order-item-row" key={`${item.cartItemId}-${index}`}>
+                        <div className="mini-visual">{(item.productName ?? 'SO').slice(0, 2).toUpperCase()}</div>
+                        <div>
+                          <strong>{item.productName ?? `상품 #${item.productId ?? '-'}`}</strong>
+                          <span>수량 {item.quantity ?? '-'}개 · 단가 {formatPrice(item.productPrice)}</span>
+                          <span className="cart-item-controls">
+                            <button
+                              type="button"
+                              onClick={() => changeCartItemQuantity(item, -1)}
+                              disabled={isLoading || (item.quantity ?? 1) <= 1}
+                            >-</button>
+                            <button
+                              type="button"
+                              onClick={() => changeCartItemQuantity(item, 1)}
+                              disabled={isLoading}
+                            >+</button>
+                            <button
+                              type="button"
+                              onClick={() => removeCartItemById(item.cartItemId)}
+                              disabled={isLoading}
+                            >삭제</button>
+                          </span>
+                        </div>
+                        <p>{formatPrice(item.lineTotal)}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="price-summary">
+                    <span>총 수량</span>
+                    <strong>{cart.totalQuantity ?? 0}개</strong>
+                    <span>총 금액</span>
+                    <strong>{formatPrice(cart.totalPrice)}</strong>
+                  </div>
+                  <div className="profile-actions">
+                    <button type="button" onClick={clearCart} disabled={isLoading}>비우기</button>
+                    <button type="button" className="primary" onClick={cartCheckout} disabled={isLoading}>
+                      주문하기
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="empty-state">장바구니가 비어 있습니다.</div>
+              )}
+            </article>
+
+            <article className="my-orders-panel">
+              <div className="section-heading compact">
+                <div>
+                  <p className="eyebrow">Orders</p>
+                  <h2>주문 내역</h2>
+                </div>
+                <button type="button" onClick={getMyOrders} disabled={!token || isLoading}>새로고침</button>
+              </div>
+
+              {!token ? (
+                <div className="empty-state">로그인하면 주문 내역을 볼 수 있습니다.</div>
+              ) : myOrders === null ? (
+                <p className="hint">주문 내역을 불러오는 중입니다…</p>
+              ) : myOrders.length === 0 ? (
+                <div className="empty-state">표시할 주문이 없습니다.</div>
+              ) : (
+                <div className="order-history">
+                  {myOrders.map((order) => (
+                    <div className="order-history-entry" key={order.orderId}>
+                      <div className="order-history-head">
+                        <div>
+                          <strong>주문 #{order.orderId ?? '-'}</strong>
+                          <span>{formatDateTime(order.createdAt)}</span>
+                        </div>
+                        <span className={orderStatusClass(order.status)}>
+                          {orderStatusLabel(order.status)}
+                        </span>
+                      </div>
+
+                      <div className="order-items">
+                        {(order.orderItems ?? []).map((item, index) => (
+                          <div className="order-item-row" key={`${order.orderId}-${item.orderItemId ?? index}`}>
+                            <div className="mini-visual">
+                              {(item.productName ?? 'SO').slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <strong>{item.productName ?? `상품 #${item.productId ?? '-'}`}</strong>
+                              <span>수량 {item.quantity ?? '-'}개 · 단가 {formatPrice(item.orderPrice)}</span>
+                            </div>
+                            <p>{formatPrice(item.itemTotalPrice)}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="order-history-foot">
+                        <span>주문 금액</span>
+                        <strong>{formatPrice(order.totalPrice)}</strong>
+                        {order.canceledAt && (
+                          <span className="hint">취소 {formatDateTime(order.canceledAt)}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (order.orderId) {
+                              void loadOrder(String(order.orderId));
+                              navigate(`/orders/${order.orderId}`);
+                            }
+                          }}
+                        >상세 · 결제</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </article>
+
+            <article className="my-orders-panel">
+              <div className="section-heading compact">
+                <div>
+                  <p className="eyebrow">Coupon &amp; Point</p>
+                  <h2>쿠폰 · 포인트</h2>
+                </div>
+              </div>
+
+              <div className="profile-actions">
+                <button type="button" onClick={getMyCoupons} disabled={!token || isLoading}>내 쿠폰</button>
+                <button type="button" onClick={getPointBalance} disabled={!token || isLoading}>포인트 잔액</button>
+                <button type="button" onClick={getPointHistories} disabled={!token || isLoading}>포인트 이력</button>
+              </div>
+              <div className="admin-form">
+                <label>발급받을 쿠폰 ID<input value={couponId} onChange={(event) => setCouponId(event.target.value)} placeholder="1" /></label>
+                <button type="button" onClick={issueCoupon} disabled={!token || !couponId || isLoading}>쿠폰 발급받기</button>
+              </div>
+              <p className="hint">조회 결과는 아래 응답 로그에 표시됩니다.</p>
+
+              <LogList logs={logs} />
+            </article>
+          </div>
         </section>
       </main>
     );
@@ -1461,172 +1588,6 @@ export default function App() {
               <button type="button" onClick={() => navigate('/')}>계속 쇼핑하기</button>
             </aside>
           </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (isMyPage) {
-    return (
-      <main className="store-shell">
-        <header className="store-header">
-          <a className="brand" href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>
-            <span className="brand-mark">S</span>
-            <span>SoldOut</span>
-          </a>
-          <nav className="store-nav" aria-label="주요 메뉴">
-            <a href="/" onClick={(event) => { event.preventDefault(); navigate('/'); }}>Products</a>
-            <a href="/my" onClick={(event) => { event.preventDefault(); navigate('/my'); }}>마이페이지</a>
-            <a href="/admin">Admin</a>
-          </nav>
-          <div className="member-chip">
-            <span>{memberLabel}</span>
-            {token ? (
-              <button type="button" onClick={clearSession}>로그아웃</button>
-            ) : (
-              <button type="button" onClick={getKakaoAuthorizeUrl} disabled={isLoading}>카카오 로그인</button>
-            )}
-          </div>
-        </header>
-
-        <section className="admin-hero">
-          <div>
-            <p className="eyebrow">My Page</p>
-            <h1>마이페이지</h1>
-            <p>{token ? `${memberLabel} 님, 장바구니·쿠폰·포인트를 확인하세요. (권한: ${currentRole ?? '-'})` : '로그인 후 이용할 수 있습니다. 아래에서 테스트용 토큰을 발급하세요.'}</p>
-          </div>
-        </section>
-
-        <section className="admin-grid">
-          {!token ? (
-            /* DEV-ONLY [배포 전 삭제]: 마이페이지의 테스트용 토큰 발급 카드 */
-            <article className="admin-card span-2">
-              <div className="card-heading">
-                <div>
-                  <p className="eyebrow">Dev</p>
-                  <h2>🔧 테스트용 토큰 발급</h2>
-                </div>
-              </div>
-              <div className="admin-form">
-                <p className="hint">카카오 없이 로컬 테스트용 토큰을 만듭니다. 일반 사용자 화면은 role 을 USER 로 발급하세요.</p>
-                <div className="two-col">
-                  <label>memberId<input value={devMemberId} onChange={(event) => setDevMemberId(event.target.value)} /></label>
-                  <label>role
-                    <select value={devRole} onChange={(event) => setDevRole(event.target.value)}>
-                      <option>USER</option>
-                      <option>ADMIN</option>
-                    </select>
-                  </label>
-                </div>
-                <label>secret<input value={devSecret} onChange={(event) => setDevSecret(event.target.value)} /></label>
-                <button type="button" className="primary" onClick={genDevToken} disabled={isLoading}>dev 토큰 생성</button>
-              </div>
-            </article>
-          ) : (
-            <>
-              <article className="admin-card">
-                <div className="card-heading">
-                  <div>
-                    <p className="eyebrow">{token ? 'Member' : 'Guest'}</p>
-                    <h2>내 정보</h2>
-                  </div>
-                  <button type="button" onClick={getMe} disabled={isLoading}>조회</button>
-                </div>
-                <div className="admin-form">
-                  <label>이메일<input value={mEmail} onChange={(event) => setMEmail(event.target.value)} placeholder="new@example.com" /></label>
-                  <label>닉네임<input value={mNick} onChange={(event) => setMNick(event.target.value)} placeholder="새 닉네임" /></label>
-                  <button type="button" className="primary" onClick={updateMe} disabled={isLoading}>프로필 수정</button>
-                </div>
-              </article>
-
-              <article className="admin-card">
-                <div className="card-heading">
-                  <div>
-                    <p className="eyebrow">Cart</p>
-                    <h2>장바구니</h2>
-                  </div>
-                  <button type="button" onClick={getCart} disabled={isLoading}>조회</button>
-                </div>
-                <div className="admin-form">
-                  <label>상품 ID<input value={productId} onChange={(event) => setProductId(event.target.value)} /></label>
-                  <label>수량<input type="number" min={1} value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} /></label>
-                  <button type="button" className="primary" onClick={addCartItem} disabled={!productId || isLoading}>담기</button>
-                  <label>장바구니 항목 ID<input value={cartItemId} onChange={(event) => setCartItemId(event.target.value)} /></label>
-                  <div className="two-col">
-                    <button type="button" onClick={updateCartItem} disabled={!cartItemId || isLoading}>수량변경</button>
-                    <button type="button" onClick={removeCartItem} disabled={!cartItemId || isLoading}>항목삭제</button>
-                  </div>
-                  <div className="two-col">
-                    <button type="button" onClick={clearCart} disabled={isLoading}>비우기</button>
-                    <button type="button" className="primary" onClick={cartCheckout} disabled={isLoading}>주문(checkout)</button>
-                  </div>
-                </div>
-
-                {cart && (cart.items?.length ?? 0) > 0 ? (
-                  <div className="order-items">
-                    {cart.items!.map((item, index) => (
-                      <div className="order-item-row" key={`${item.cartItemId}-${index}`}>
-                        <div className="mini-visual">{(item.productName ?? 'SO').slice(0, 2).toUpperCase()}</div>
-                        <div>
-                          <strong>{item.productName ?? `상품 #${item.productId ?? '-'}`}</strong>
-                          <span>수량 {item.quantity ?? '-'}개 · 단가 {formatPrice(item.productPrice)} · 항목ID {item.cartItemId ?? '-'}</span>
-                        </div>
-                        <p>{formatPrice(item.lineTotal)}</p>
-                      </div>
-                    ))}
-                    <div className="price-summary">
-                      <span>총 수량</span>
-                      <strong>{cart.totalQuantity ?? 0}개</strong>
-                      <span>총 금액</span>
-                      <strong>{formatPrice(cart.totalPrice)}</strong>
-                    </div>
-                  </div>
-                ) : cart ? (
-                  <div className="empty-state">장바구니가 비어 있습니다.</div>
-                ) : (
-                  <p className="hint">「조회」를 누르면 담긴 상품이 여기에 표시됩니다.</p>
-                )}
-              </article>
-
-              <article className="admin-card">
-                <div className="card-heading">
-                  <div>
-                    <p className="eyebrow">Coupon</p>
-                    <h2>쿠폰</h2>
-                  </div>
-                  <button type="button" onClick={getMyCoupons} disabled={isLoading}>내 쿠폰</button>
-                </div>
-                <div className="admin-form">
-                  <label>쿠폰 ID<input value={couponId} onChange={(event) => setCouponId(event.target.value)} /></label>
-                  <button type="button" className="primary" onClick={issueCoupon} disabled={!couponId || isLoading}>발급받기</button>
-                </div>
-              </article>
-
-              <article className="admin-card">
-                <div className="card-heading">
-                  <div>
-                    <p className="eyebrow">Point</p>
-                    <h2>포인트</h2>
-                  </div>
-                </div>
-                <div className="admin-form">
-                  <button type="button" onClick={getPointBalance} disabled={isLoading}>잔액 조회</button>
-                  <button type="button" onClick={getPointHistories} disabled={isLoading}>이력 조회</button>
-                </div>
-              </article>
-
-              <article className="admin-card span-2">
-                <div className="card-heading">
-                  <div>
-                    <p className="eyebrow">Logs</p>
-                    <h2>응답 로그</h2>
-                  </div>
-                  <button type="button" onClick={() => setLogs([])}>비우기</button>
-                </div>
-                <LogList logs={logs} />
-              </article>
-            </>
-          )}
         </section>
       </main>
     );
