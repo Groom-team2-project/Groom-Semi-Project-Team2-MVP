@@ -42,9 +42,9 @@ public class ImageService {
 
     //이미지 수정
     @Transactional
-    public ImageResponse updateImage(Long imageId, ImageUpdateRequest request) {
+    public ImageResponse updateImage(Long productId, Long imageId, ImageUpdateRequest request) {
         //이미지 찾을 수 없을 때
-        ImageEntity image = imageRepository.findById(imageId)
+        ImageEntity image = imageRepository.findByImageIdAndProductProductId(imageId, productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
 
         image.update(request.getDetailImage());
@@ -54,9 +54,9 @@ public class ImageService {
 
     //이미지 삭제
     @Transactional
-    public ImageResponse deleteImage(Long imageId) {
+    public ImageResponse deleteImage(Long productId, Long imageId) {
         //이미지 찾을 수 없을 때
-        ImageEntity image = imageRepository.findById(imageId)
+        ImageEntity image = imageRepository.findByImageIdAndProductProductId(imageId, productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
 
         ImageResponse response = ImageResponse.from(image);

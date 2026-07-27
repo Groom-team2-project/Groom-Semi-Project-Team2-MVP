@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.category.dto.CategoryResponse;
 import org.example.groommvp.domain.category.entity.CategoryEntity;
 import org.example.groommvp.domain.category.repository.CategoryRepository;
 import org.example.groommvp.domain.product.dto.*;
@@ -37,7 +38,7 @@ public class ProductServiceImpl implements ProductService{
         CategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
         if (category.getParentCategory() == null) {
-            throw new BusinessException(ErrorCode.INVALID_PARENT_CATEGORY);
+            throw new BusinessException(ErrorCode.INVALID_PRODUCT_CATEGORY);
         }
 
         ProductEntity product = ProductEntity.builder()
@@ -71,7 +72,7 @@ public class ProductServiceImpl implements ProductService{
         CategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
         if (category.getParentCategory() == null) {
-            throw new BusinessException(ErrorCode.INVALID_PARENT_CATEGORY);
+            throw new BusinessException(ErrorCode.INVALID_PRODUCT_CATEGORY);
         }
 
         StockEntity stock = stockRepository.findByProduct_ProductId(productId)
@@ -102,7 +103,10 @@ public class ProductServiceImpl implements ProductService{
         if (stock.getStocks() > 0) {
             throw new BusinessException(ErrorCode.PRODUCT_STOCK_REMAINING);
         }
-        return ProductResponse.from(product, stock);
+        ProductResponse response = ProductResponse.from(product, stock);
+        productRepository.delete(product);
+
+        return response;
     }
 
     //상품 단건 조회

@@ -31,17 +31,19 @@ public class ImageController {
 
     @PutMapping("/{imageId}")
     public ResponseEntity<CommonResponse<ImageResponse>> updateImages(
+            @PathVariable Long productId,
             @PathVariable Long imageId,
             @Valid @RequestBody ImageUpdateRequest request) {
-        ImageResponse response = imageService.updateImage(imageId, request);
+        ImageResponse response = imageService.updateImage(productId, imageId, request);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(CommonResponse.success(response, "이미지가 수정되었습니다."));
     }
 
     @DeleteMapping("/{imageId}")
     public ResponseEntity<CommonResponse<ImageResponse>> deleteImages(
+            @PathVariable Long productId,
             @PathVariable Long imageId) {
-        ImageResponse response = imageService.deleteImage(imageId);
+        ImageResponse response = imageService.deleteImage(productId, imageId);
         return ResponseEntity.status(HttpStatus.OK)
                 .body(CommonResponse.success(response, "이미지가 삭제되었습니다."));
     }
