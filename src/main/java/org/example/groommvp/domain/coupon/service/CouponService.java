@@ -121,22 +121,41 @@ public class CouponService {
      */
     @Transactional
     public long useCoupon(Long memberId, Long memberCouponId, long orderAmount, Long orderId) {
-        MemberCouponEntity memberCoupon = memberCouponRepository.findByIdWithCoupon(memberCouponId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_COUPON_NOT_FOUND));
-        if (!memberCoupon.isOwnedBy(memberId)) {
-            throw new BusinessException(ErrorCode.MEMBER_COUPON_FORBIDDEN);
-        }
+        MemberCouponEntity memberCoupon = findOwnedCouponWithLock(memberId, memberCouponId);
         return memberCoupon.use(orderAmount, orderId, LocalDateTime.now());
     }
 
-    /** 주문 취소/결제 실패 시 쿠폰 사용을 되돌린다. (파트 C/D 연동용 진입점) */
+    /**
+     * 주문 취소/결제 실패 시 쿠폰 사용을 되돌린다. (파트 C/D 연동용 진입점)
+     *
+     * <p><b>멱등성:</b> {@code orderId} 를 받아 그 주문에 사용된 경우에만 되돌린다. 주문 A 의
+     * 취소가 주문 B 에 쓴 쿠폰을 되살리는 일이 없고, 취소 이벤트가 재전송돼도 안전하다.
+     * ({@code PointService#cancelUse} 와 같은 방식)
+     *
+     * @param orderId 취소 대상 주문 ID (필수)
+     */
     @Transactional
-    public void cancelCouponUse(Long memberId, Long memberCouponId) {
-        MemberCouponEntity memberCoupon = memberCouponRepository.findByIdWithCoupon(memberCouponId)
+    public void cancelCouponUse(Long memberId, Long memberCouponId, Long orderId) {
+        if (orderId == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        MemberCouponEntity memberCoupon = findOwnedCouponWithLock(memberId, memberCouponId);
+        memberCoupon.cancelUseFor(orderId);
+    }
+
+    /**
+     * 보유 쿠폰을 <b>락을 걸어</b> 조회하고 소유권을 검증한다.
+     *
+     * <p>사용/사용취소는 모두 read-modify-write 라서 락 없이는 동시 요청이 같은 상태를 읽고
+     * 각자 갱신한다. 락 획득 후에 소유권을 보므로, 검증과 갱신 사이에 상태가 바뀔 수 없다.
+     */
+    private MemberCouponEntity findOwnedCouponWithLock(Long memberId, Long memberCouponId) {
+        MemberCouponEntity memberCoupon = memberCouponRepository
+                .findByIdWithPessimisticLock(memberCouponId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_COUPON_NOT_FOUND));
         if (!memberCoupon.isOwnedBy(memberId)) {
             throw new BusinessException(ErrorCode.MEMBER_COUPON_FORBIDDEN);
         }
-        memberCoupon.cancelUse();
+        return memberCoupon;
     }
 }

@@ -16,6 +16,7 @@ import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.domain.stock.entity.StockEntity;
+import org.example.groommvp.domain.stock.entity.StockHistoryType;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
@@ -24,6 +25,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 class OrderCancelConcurrencyTest {
@@ -34,6 +37,9 @@ class OrderCancelConcurrencyTest {
     @Autowired private StockHistoryRepository stockHistoryRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private OrderItemRepository orderItemRepository;
+
+    @MockitoBean
+    private JavaMailSender mailSender;
 
     // 각 테스트 후 데이터 정리 (자식 → 부모 순서로 삭제)
     @AfterEach
@@ -51,7 +57,8 @@ class OrderCancelConcurrencyTest {
         // given: 상품 / 재고(0) / 주문(COMPLETED) / 주문품목(2개) 준비
         ProductEntity product = productRepository.save(ProductEntity.builder().productName("Test Product").productPrice(10000).build());
         stockRepository.save(new StockEntity(product, 0));                 // 취소 전 재고 0
-        Order order = orderRepository.save(new Order(20000L));             // COMPLETED 주문
+        Long memberId = 100L;
+        Order order = orderRepository.save(new Order(memberId, 20000L));   // COMPLETED 주문
         orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 구매했던 품목
         Long orderId = order.getId();
 
@@ -67,7 +74,7 @@ class OrderCancelConcurrencyTest {
             executorService.submit(() -> {
                 try {
                     startLatch.await();                  // 신호총 울릴 때까지 대기
-                    orderCancelService.cancel(orderId);
+                    orderCancelService.cancel(orderId, memberId);
                     successCount.incrementAndGet();      // 취소 성공
                 } catch (BusinessException e) {
                     failCount.incrementAndGet();         // 중복 취소로 차단됨
@@ -91,5 +98,72 @@ class OrderCancelConcurrencyTest {
         assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);        // 취소됨
         assertThat(stockRepository.findAll().get(0).getStocks()).isEqualTo(2);   // 0 + 2, 딱 1번 복구
         assertThat(stockHistoryRepository.count()).isEqualTo(1);                 // RESTORE 이력 1건뿐
+    }
+
+    @Test
+    @DisplayName("PENDING_PAYMENT 주문에 취소 요청 100개가 와도 예약은 한 번만 해제된다")
+    void concurrentCancel_pendingPayment_releasesOnlyOnce()
+            throws InterruptedException {
+        // given
+        ProductEntity product = productRepository.save(
+                ProductEntity.builder()
+                        .productName("Pending Product")
+                        .productPrice(10000)
+                        .build()
+        );
+
+        StockEntity stock = new StockEntity(product, 10);
+        stock.reserve(2);
+        stockRepository.save(stock);
+
+        Long memberId = 100L;
+        Order order = orderRepository.save(
+                Order.pendingPayment(memberId, 20000L)
+        );
+
+        orderItemRepository.save(
+                new OrderItem(order, product, 2, 10000)
+        );
+
+        Long orderId = order.getId();
+
+        int threadCount = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger();
+        AtomicInteger failCount = new AtomicInteger();
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    startLatch.await();
+                    orderCancelService.cancel(orderId, memberId);
+                    successCount.incrementAndGet();
+                } catch (BusinessException e) {
+                    failCount.incrementAndGet();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
+        executorService.shutdown();
+
+        // then
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(failCount.get()).isEqualTo(99);
+
+        StockEntity savedStock = stockRepository.findAll().get(0);
+        assertThat(savedStock.getStocks()).isEqualTo(10);
+        assertThat(savedStock.getReservedStocks()).isZero();
+
+        assertThat(stockHistoryRepository.count()).isEqualTo(1);
+        assertThat(stockHistoryRepository.findAll().get(0).getChangeType())
+                .isEqualTo(StockHistoryType.RELEASE);
     }
 }
