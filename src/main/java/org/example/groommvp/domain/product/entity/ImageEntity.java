@@ -9,13 +9,7 @@ import org.example.groommvp.global.entity.BaseEntity;
 
 @Entity
 @Getter
-@Table(
-        name = "product_images",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_product_images_product_id",
-                columnNames = "product_id"
-        )
-)
+@Table(name = "product_images")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ImageEntity extends BaseEntity {
 
@@ -28,15 +22,21 @@ public class ImageEntity extends BaseEntity {
     @JoinColumn(name = "product_id", nullable = false)
     private ProductEntity product;
 
-    @Column(name = "image_url", nullable = false)
-    private String imageUrl;
+    @Column(name = "detail_image", nullable = false)
+    private String detailImage;
 
     @Builder
     public ImageEntity(
             ProductEntity product,
-            String imageUrl
+            String detailImage
     ) {
         this.product = product;
-        this.imageUrl = imageUrl;
+        this.detailImage = detailImage;
+    }
+
+    public void update(
+            String detailImage
+    ) {
+        this.detailImage = detailImage;
     }
 }

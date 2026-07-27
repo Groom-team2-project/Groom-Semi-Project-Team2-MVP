@@ -16,14 +16,14 @@ public class ImageResponse {
     @Schema(description = "이미지 ID")
     private final Long imageId;
 
-    @Schema(description = "이미지 URL")
-    private final String imageUrl;
+    @Schema(description = "상세 이미지")
+    private final String detailImage;
 
     public static ImageResponse from(ImageEntity image) {
         return ImageResponse.builder()
                 .productId(image.getProduct().getProductId())
                 .imageId(image.getImageId())
-                .imageUrl(image.getImageUrl())
+                .detailImage(image.getDetailImage())
                 .build();
     }
 }

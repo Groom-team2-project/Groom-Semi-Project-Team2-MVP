@@ -54,12 +54,12 @@ public enum ErrorCode {
     COUPON_MIN_ORDER_NOT_MET(HttpStatus.BAD_REQUEST, "쿠폰 사용 최소 주문 금액을 충족하지 않습니다."),
 
     IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."),
-    IMAGE_ALREADY_EXISTS(HttpStatus.CONFLICT, "상품 이미지는 하나만 등록할 수 있습니다."),
+    IMAGE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "이미지는 최대 10장까지 가능합니다."),
     
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
     CATEGORY_NAME_DUPLICATED(HttpStatus.CONFLICT, "중복된 카테고리명입니다."),
-    PARENT_CATEGORY_MISSING(HttpStatus.CONFLICT, "중분류 카테고리를 입력하세요."),
-    INVALID_PARENT_CATEGORY(HttpStatus.CONFLICT, "대분류에만 추가할 수 있습니다."),
+    INVALID_PARENT_CATEGORY(HttpStatus.CONFLICT, "중분류는 대분류에 추가할 수 있습니다."),
+    INVALID_PRODUCT_CATEGORY(HttpStatus.BAD_REQUEST, "상품은 중분류에 추가할 수 있습니다."),
     CATEGORY_HAS_CHILDREN(HttpStatus.CONFLICT, "하위 카테고리가 있어 카테고리를 삭제할 수 없습니다."),
     CATEGORY_HAS_PRODUCTS(HttpStatus.CONFLICT, "연결된 상품이 있어 카테고리를 삭제할 수 없습니다."),
     CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "등록된 내용이 없습니다."),
