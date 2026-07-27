@@ -64,6 +64,7 @@ public enum ErrorCode {
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "동일 회원은 동일 상품에 리뷰를 하나만 등록할 수 있습니다."),
     REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "다른 회원이 작성한 리뷰에 접근할 수 없습니다."),
+    REVIEW_PURCHASE_REQUIRED(HttpStatus.FORBIDDEN, "결제 완료된 구매 상품만 리뷰를 작성할 수 있습니다."),
 
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제를 찾을 수 없습니다."),
     PAYMENT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 결제된 주문입니다."),
