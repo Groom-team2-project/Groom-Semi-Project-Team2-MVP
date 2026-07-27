@@ -48,7 +48,10 @@ public class OrderCancelService {
         Order order = orderRepository.findByIdWithPessimisticLock(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
-        // 2. 취소
+        // 2. 취소 — 재고 처리 방식은 "취소 전" 상태로 갈린다.
+        //    결제 대기(예약만 잡힌) 주문은 실재고가 줄지 않았으므로 예약만 해제하고,
+        //    결제 완료 주문은 실재고가 이미 차감됐으므로 실재고를 복구한다.
+        boolean reservedOnly = order.getStatus().isPendingPayment();
         order.cancel();
 
         // 3. 이 주문에 속한 품목들 조회
@@ -63,11 +66,17 @@ public class OrderCancelService {
             StockEntity stock = stockRepository.findByProductIdWithPessimisticLock(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
 
-            stock.increase(quantity);
-
-            stockHistoryRepository.save(
-                StockHistoryEntity.restore(stock, orderId, quantity, CANCEL_REASON)
-            );
+            if (reservedOnly) {
+                stock.release(quantity);
+                stockHistoryRepository.save(
+                    StockHistoryEntity.release(stock, orderId, quantity, CANCEL_REASON)
+                );
+            } else {
+                stock.increase(quantity);
+                stockHistoryRepository.save(
+                    StockHistoryEntity.restore(stock, orderId, quantity, CANCEL_REASON)
+                );
+            }
 
             restoredItems.add(new RestoredItemResponse(productId, quantity));
         }

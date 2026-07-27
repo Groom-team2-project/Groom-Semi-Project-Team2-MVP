@@ -21,11 +21,13 @@ import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
+import org.example.groommvp.domain.stock.entity.StockHistoryType;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -68,6 +70,38 @@ class OrderCancelServiceTest {
 		assertThat(response.restoredItems().get(0).productId()).isEqualTo(10L);
 		assertThat(response.restoredItems().get(0).quantity()).isEqualTo(2);
 		verify(stockHistoryRepository).save(any(StockHistoryEntity.class)); // RESTORE 이력 저장됨
+	}
+
+	@Test
+	@DisplayName("결제 대기 주문을 취소하면 실재고는 그대로이고 예약만 해제된다")
+	void cancel_pendingPayment_releasesReservationOnly() {
+		// given: 재고 10개 중 2개가 예약된 결제 대기 주문
+		Long orderId = 1L;
+		ProductEntity product = product(10L, "티셔츠", 10000);
+		Order order = Order.pendingPayment(20000L);
+		ReflectionTestUtils.setField(order, "id", orderId);
+		OrderItem orderItem = new OrderItem(order, product, 2, 10000);
+		StockEntity stock = StockEntity.builder().product(product).stocks(10).build();
+		stock.reserve(2);
+
+		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
+		given(orderItemRepository.findByOrder(order)).willReturn(List.of(orderItem));
+		given(stockRepository.findByProductIdWithPessimisticLock(10L)).willReturn(Optional.of(stock));
+		given(stockHistoryRepository.save(any(StockHistoryEntity.class)))
+			.willAnswer(invocation -> invocation.getArgument(0));
+
+		// when
+		orderCancelService.cancel(orderId);
+
+		// then: 결제 전이라 실재고는 줄지 않았으므로 늘어나서도 안 된다 (재고 뻥튀기 방지)
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+		assertThat(stock.getStocks()).isEqualTo(10);            // 실재고 유지
+		assertThat(stock.getReservedStocks()).isZero();         // 예약만 해제
+		assertThat(stock.getAvailableStocks()).isEqualTo(10);   // 다시 판매 가능
+
+		ArgumentCaptor<StockHistoryEntity> captor = ArgumentCaptor.forClass(StockHistoryEntity.class);
+		verify(stockHistoryRepository).save(captor.capture());
+		assertThat(captor.getValue().getChangeType()).isEqualTo(StockHistoryType.RELEASE);
 	}
 
 	@Test
