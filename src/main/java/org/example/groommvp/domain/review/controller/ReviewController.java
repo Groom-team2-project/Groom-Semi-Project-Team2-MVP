@@ -28,7 +28,7 @@ public class ReviewController {
 
     @Operation(
             summary = "리뷰 등록",
-            description = "상품 리뷰를 등록합니다.",
+            description = "결제가 완료된 상품의 구매자만 리뷰를 등록할 수 있습니다.",
             security = @SecurityRequirement(name = "bearerAuth")
     )
     @PostMapping("/reviews")

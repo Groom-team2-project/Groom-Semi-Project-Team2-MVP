@@ -73,6 +73,6 @@ public class CategoryController {
     public ResponseEntity<CommonResponse<CategoryDetailResponse>> getCategory(
             @PathVariable Long categoryId) {
         CategoryDetailResponse response = categoryService.getCategory(categoryId);
-        return ResponseEntity.ok(CommonResponse.success(response, "카테고리 목록 조회 성공"));
+        return ResponseEntity.ok(CommonResponse.success(response, "카테고리 상세 조회 성공"));
     }
 }
