@@ -14,7 +14,9 @@ spring:
       hibernate:
         format_sql: true
 
-  # JavaMailSender 빈 생성을 위한 더미 설정 (테스트에서 실제 메일은 보내지 않는다)
+  # EmailService 가 JavaMailSender 를 주입받으므로, 호스트가 없으면 해당 빈이 만들어지지 않아
+  # 모든 @SpringBootTest 컨텍스트 로딩이 실패한다. (운영 설정은 application-local.yaml 에만 있다)
+  # 테스트는 실제로 메일을 보내지 않으므로 자동 구성만 통과시키는 더미 호스트를 둔다.
   mail:
     host: localhost
     port: 3025
@@ -24,6 +26,13 @@ spring:
 redis:
   host: ${REDIS_HOST:localhost}
   port: ${REDIS_PORT:6379}
+
+cart:
+  reservation:
+    expiry:
+      # 테스트 중 스케줄러가 끼어들어 다른 테스트의 주문을 취소하지 않도록 끈다.
+      # 회수 로직 자체는 ReservationExpiryServiceTest 가 직접 호출해 검증한다.
+      enabled: false
 
 app:
   jwt:

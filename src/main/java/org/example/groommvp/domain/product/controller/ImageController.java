@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.ImageCreateRequest;
 import org.example.groommvp.domain.product.dto.ImageResponse;
+import org.example.groommvp.domain.product.dto.ImageUpdateRequest;
 import org.example.groommvp.domain.product.service.ImageService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.springframework.http.HttpStatus;
@@ -20,7 +21,7 @@ public class ImageController {
     private final ImageService imageService;
 
     @PostMapping
-    public ResponseEntity<CommonResponse<ImageResponse>> createImage(
+    public ResponseEntity<CommonResponse<ImageResponse>> createDetailImages(
             @PathVariable Long productId,
             @Valid @RequestBody ImageCreateRequest request) {
         ImageResponse response = imageService.saveImage(productId, request);
@@ -28,9 +29,22 @@ public class ImageController {
                 .body(CommonResponse.success(response, "이미지가 저장되었습니다."));
     }
 
-    @DeleteMapping
-    public ResponseEntity<Void> deleteImage(@PathVariable Long productId) {
-        imageService.deleteImage(productId);
-        return ResponseEntity.noContent().build();
+    @PutMapping("/{imageId}")
+    public ResponseEntity<CommonResponse<ImageResponse>> updateImages(
+            @PathVariable Long productId,
+            @PathVariable Long imageId,
+            @Valid @RequestBody ImageUpdateRequest request) {
+        ImageResponse response = imageService.updateImage(productId, imageId, request);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(response, "이미지가 수정되었습니다."));
+    }
+
+    @DeleteMapping("/{imageId}")
+    public ResponseEntity<CommonResponse<ImageResponse>> deleteImages(
+            @PathVariable Long productId,
+            @PathVariable Long imageId) {
+        ImageResponse response = imageService.deleteImage(productId, imageId);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(CommonResponse.success(response, "이미지가 삭제되었습니다."));
     }
 }

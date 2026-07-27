@@ -3,6 +3,7 @@ package org.example.groommvp.domain.cancel.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,7 +28,6 @@ import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -44,15 +44,15 @@ class OrderCancelServiceTest {
 	@InjectMocks private OrderCancelService orderCancelService;
 
 	@Test
-	@DisplayName("결제 대기 주문을 취소하면 CANCELED가 되고 예약 재고만 해제된다")
+	@DisplayName("주문을 취소하면 상태가 CANCELED로 바뀌고 재고가 복구된다")
 	void cancel_success() {
-		// given: 재고 10개 중 2개가 예약된 결제 대기 주문
+		// given
 		Long orderId = 1L;
+		Long memberId = 100L;
 		ProductEntity product = product(10L, "티셔츠", 10000);
-		Order order = pendingOrder(orderId);
-		OrderItem orderItem = new OrderItem(order, product, 2, 10000);   // 2개 주문했던 품목
-		StockEntity stock = StockEntity.builder().product(product).stocks(10).build();
-		stock.reserve(2);
+		Order order = order(orderId, memberId);                          // COMPLETED 주문
+		OrderItem orderItem = new OrderItem(order, product, 2, 10000);   // 2개 샀던 품목
+		StockEntity stock = StockEntity.builder().product(product).stocks(8).build(); // 현재 재고 8
 
 		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
 		given(orderItemRepository.findByOrder(order)).willReturn(List.of(orderItem));
@@ -61,40 +61,56 @@ class OrderCancelServiceTest {
 			.willAnswer(invocation -> invocation.getArgument(0));
 
 		// when
-		OrderCancelResponse response = orderCancelService.cancel(orderId);
+		OrderCancelResponse response = orderCancelService.cancel(orderId, memberId);
 
-		// then: 결제 전이라 실재고는 줄지 않았으므로 늘어나서도 안 된다 (재고 뻥튀기 방지)
+		// then
 		assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);  // 상태 변경됨
 		assertThat(order.getCanceledAt()).isNotNull();                  // 취소 시각 기록됨
-		assertThat(stock.getStocks()).isEqualTo(10);           // 실재고 유지
-		assertThat(stock.getReservedStocks()).isZero();        // 예약만 해제
-		assertThat(stock.getAvailableStocks()).isEqualTo(10);  // 다시 판매 가능
+		assertThat(stock.getStocks()).isEqualTo(10);           // 8 + 2 = 재고 복구됨
 		assertThat(response.restoredItems()).hasSize(1);
 		assertThat(response.restoredItems().get(0).productId()).isEqualTo(10L);
 		assertThat(response.restoredItems().get(0).quantity()).isEqualTo(2);
-
-		ArgumentCaptor<StockHistoryEntity> captor = ArgumentCaptor.forClass(StockHistoryEntity.class);
-		verify(stockHistoryRepository).save(captor.capture());
-		assertThat(captor.getValue().getChangeType()).isEqualTo(StockHistoryType.RELEASE);
+		verify(stockHistoryRepository).save(any(StockHistoryEntity.class)); // RESTORE 이력 저장됨
 	}
 
 	@Test
-	@DisplayName("결제 완료 주문은 취소 API로 취소할 수 없고 환불로 안내된다")
-	void cancel_completedOrder_requiresRefund() {
-		// given: 결제까지 끝난 주문 (여기서 취소되면 돈은 안 돌려주고 재고만 복구되는 문제)
-		Long orderId = 1L;
-		Order order = order(orderId);   // COMPLETED 주문
-		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
+	@DisplayName("PENDING_PAYMENT 주문 취소 시 실제 재고는 유지하고 예약만 해제한다")
+	void cancel_pendingPayment_releasesReservation() {
+		// given
+		Long orderId = 2L;
+		Long memberId = 100L;
+		ProductEntity product = product(10L, "티셔츠", 10000);
+		Order order = Order.pendingPayment(memberId, 20000L);
+		ReflectionTestUtils.setField(order, "id", orderId);
 
-		// when & then
-		assertThatThrownBy(() -> orderCancelService.cancel(orderId))
-			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode")
-			.isEqualTo(ErrorCode.ORDER_REFUND_REQUIRED);
+		OrderItem orderItem = new OrderItem(order, product, 2, 10000);
+		StockEntity stock = StockEntity.builder()
+				.product(product)
+				.stocks(10)
+				.build();
+		stock.reserve(2);
 
-		// 주문 상태도, 재고도 건드리지 않아야 한다
-		assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
-		verify(stockHistoryRepository, never()).save(any());
+		given(orderRepository.findByIdWithPessimisticLock(orderId))
+				.willReturn(Optional.of(order));
+		given(orderItemRepository.findByOrder(order))
+				.willReturn(List.of(orderItem));
+		given(stockRepository.findByProductIdWithPessimisticLock(10L))
+				.willReturn(Optional.of(stock));
+		given(stockHistoryRepository.save(any(StockHistoryEntity.class)))
+				.willAnswer(invocation -> invocation.getArgument(0));
+
+		// when
+		OrderCancelResponse response = orderCancelService.cancel(orderId, memberId);
+
+		// then
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+		assertThat(stock.getStocks()).isEqualTo(10);
+		assertThat(stock.getReservedStocks()).isZero();
+		assertThat(response.restoredItems()).hasSize(1);
+		verify(stockHistoryRepository).save(argThat(history ->
+				history.getChangeType() == StockHistoryType.RELEASE
+						&& history.getChangedQty() == 2
+		));
 	}
 
 	@Test
@@ -105,7 +121,7 @@ class OrderCancelServiceTest {
 		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.empty());
 
 		// when & then: 예외 타입 + 에러코드 검증
-		assertThatThrownBy(() -> orderCancelService.cancel(orderId))
+		assertThatThrownBy(() -> orderCancelService.cancel(orderId, 100L))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(ErrorCode.ORDER_NOT_FOUND);
@@ -119,17 +135,56 @@ class OrderCancelServiceTest {
 	void cancel_alreadyCanceled() {
 		// given
 		Long orderId = 1L;
-		Order order = pendingOrder(orderId);
+		Long memberId = 100L;
+		Order order = order(orderId, memberId);
 		order.cancel(); // 첫 취소 → CANCELED 상태가 됨
 		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
 
 		// when & then
-		assertThatThrownBy(() -> orderCancelService.cancel(orderId))
+		assertThatThrownBy(() -> orderCancelService.cancel(orderId, memberId))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(ErrorCode.ORDER_ALREADY_CANCELED);
 
 		// 중복 취소가 막혔으니 재고 복구 이력도 저장되면 안 됨 (재고 뻥튀기 방지)
+		verify(stockHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("다른 회원의 주문을 취소하면 ORDER_FORBIDDEN 예외가 발생한다")
+	void cancel_otherMembersOrder() {
+		// given
+		Long orderId = 1L;
+		Order order = order(orderId, 100L);
+		given(orderRepository.findByIdWithPessimisticLock(orderId))
+				.willReturn(Optional.of(order));
+
+		// when & then
+		assertThatThrownBy(() -> orderCancelService.cancel(orderId, 200L))
+				.isInstanceOf(BusinessException.class)
+				.extracting("errorCode")
+				.isEqualTo(ErrorCode.ORDER_FORBIDDEN);
+
+		verify(orderItemRepository, never()).findByOrder(any());
+		verify(stockHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("회원 ID가 null이면 ORDER_FORBIDDEN 예외가 발생한다")
+	void cancel_nullMemberId() {
+		// given
+		Long orderId = 1L;
+		Order order = order(orderId, 100L);
+		given(orderRepository.findByIdWithPessimisticLock(orderId))
+				.willReturn(Optional.of(order));
+
+		// when & then
+		assertThatThrownBy(() -> orderCancelService.cancel(orderId, null))
+				.isInstanceOf(BusinessException.class)
+				.extracting("errorCode")
+				.isEqualTo(ErrorCode.ORDER_FORBIDDEN);
+
+		verify(orderItemRepository, never()).findByOrder(any());
 		verify(stockHistoryRepository, never()).save(any());
 	}
 
@@ -139,16 +194,8 @@ class OrderCancelServiceTest {
 		return product;
 	}
 
-	/** 결제 완료(COMPLETED) 주문 */
-	private Order order(Long id) {
-		Order order = new Order(20000L);
-		ReflectionTestUtils.setField(order, "id", id);
-		return order;
-	}
-
-	/** 결제 대기(PENDING_PAYMENT) 주문 — 취소 API가 다루는 정상 대상 */
-	private Order pendingOrder(Long id) {
-		Order order = Order.pendingPayment(20000L);
+	private Order order(Long id, Long memberId) {
+		Order order = new Order(memberId, 20000L);
 		ReflectionTestUtils.setField(order, "id", id);
 		return order;
 	}

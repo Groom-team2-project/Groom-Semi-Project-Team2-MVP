@@ -1,5 +1,6 @@
 package org.example.groommvp.domain.product.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -27,12 +28,22 @@ public class ProductCreateRequest {
     @Positive(message = "제품 가격은 0보다 커야 합니다.")
     private Integer productPrice;
 
+    @Schema(description = "상품 이미지", example = "https://example.com/product.jpg",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotBlank(message = "등록할 제품의 이미지을 입력하세요.")
+    @JsonProperty("image")
+    private String productImage;
+
     @Schema(description = "초기 재고 수량 (1 이상)", example = "100",
             minimum = "1", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "등록할 제품의 수량을 입력하세요.")
     @Positive(message = "제품 수량은 0보다 커야 합니다.")
+    @JsonProperty("stock")
     private Integer stocks;
 
-    @Schema(description = "상품이 속할 중분류 카테고리 ID", example = "2")
+    @Schema(description = "카테고리", example = "2",
+            requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "등록할 제품의 중분류 카테고리를 입력하세요.")
+    @JsonProperty("category")
     private Long categoryId;
 }

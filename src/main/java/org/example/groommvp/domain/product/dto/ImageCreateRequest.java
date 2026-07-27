@@ -14,5 +14,5 @@ public class ImageCreateRequest {
 
     @Schema(description = "상품 이미지")
     @NotBlank(message = "상품 이미지를 등록하세요.")
-    private String imageUrl;
+    private String detailImage;
 }

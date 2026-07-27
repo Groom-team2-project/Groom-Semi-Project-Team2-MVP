@@ -33,7 +33,7 @@ class CategoryServiceImpTest {
     private ProductRepository productRepository;
 
     @InjectMocks
-    private CategoryServiceImp categoryService;
+    private CategoryServiceImpl categoryService;
 
     @Test
     void getLargeCategories_returnsOnlyLargeCategories() {

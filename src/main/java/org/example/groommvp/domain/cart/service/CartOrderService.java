@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.cart.service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.cart.config.CartCacheNames;
@@ -54,10 +55,15 @@ public class CartOrderService {
         CartEntity cart = cartRepository.findByMemberIdWithItems(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CART_EMPTY));
 
-        List<CartItemEntity> items = cart.getItems();
-        if (items.isEmpty()) {
+        if (cart.getItems().isEmpty()) {
             throw new BusinessException(ErrorCode.CART_EMPTY);
         }
+
+        // 데드락 방지: 재고 락을 항상 상품 ID 오름차순으로 잡는다. 담은 순서대로 잠그면
+        // 같은 두 상품을 반대 순서로 담은 회원끼리 서로의 락을 기다려 교착한다.
+        List<CartItemEntity> items = cart.getItems().stream()
+                .sorted(Comparator.comparing(item -> item.getProduct().getProductId()))
+                .toList();
 
         // 1) 재고 예약 + 총액 계산 (상품별 비관적 락)
         long totalPrice = 0L;
@@ -65,6 +71,12 @@ public class CartOrderService {
         for (CartItemEntity item : items) {
             ProductEntity product = item.getProduct();
             int quantity = item.getQuantity();
+
+            // 담은 뒤 상품이 삭제됐을 수 있다. 담기({@code CartService#addItem})에서만 막으면
+            // 장바구니에 오래 머문 항목이 그대로 주문된다.
+            if (product.getDeletedAt() != null) {
+                throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
+            }
 
             StockEntity stock = stockRepository
                     .findByProductIdWithPessimisticLock(product.getProductId())

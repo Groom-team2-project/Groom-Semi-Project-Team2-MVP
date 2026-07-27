@@ -100,15 +100,40 @@ class MemberCouponEntityTest {
     }
 
     @Test
-    @DisplayName("사용을 취소하면 다시 사용 가능한 상태가 된다")
-    void cancelUse_restoresUsableState() {
+    @DisplayName("사용한 주문을 취소하면 다시 사용 가능한 상태가 된다")
+    void cancelUseFor_restoresUsableState() {
         MemberCouponEntity memberCoupon = MemberCouponEntity.issue(member(1L), coupon(), NOW);
         memberCoupon.use(10_000L, 42L, NOW);
 
-        memberCoupon.cancelUse();
+        assertThat(memberCoupon.cancelUseFor(42L)).isTrue();
 
         assertThat(memberCoupon.isUsed()).isFalse();
         assertThat(memberCoupon.getUsedOrderId()).isNull();
+        assertThat(memberCoupon.isUsable(NOW)).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 주문의 취소로는 사용이 되돌려지지 않는다 (주문 격리)")
+    void cancelUseFor_ignoresOtherOrder() {
+        MemberCouponEntity memberCoupon = MemberCouponEntity.issue(member(1L), coupon(), NOW);
+        memberCoupon.use(10_000L, 42L, NOW);
+
+        assertThat(memberCoupon.cancelUseFor(99L)).isFalse();
+
+        assertThat(memberCoupon.isUsed()).isTrue();
+        assertThat(memberCoupon.getUsedOrderId()).isEqualTo(42L);
+    }
+
+    @Test
+    @DisplayName("이미 취소된 쿠폰을 다시 취소해도 상태가 흔들리지 않는다 (멱등)")
+    void cancelUseFor_isIdempotent() {
+        MemberCouponEntity memberCoupon = MemberCouponEntity.issue(member(1L), coupon(), NOW);
+        memberCoupon.use(10_000L, 42L, NOW);
+        memberCoupon.cancelUseFor(42L);
+
+        assertThat(memberCoupon.cancelUseFor(42L)).isFalse();
+
+        assertThat(memberCoupon.isUsed()).isFalse();
         assertThat(memberCoupon.isUsable(NOW)).isTrue();
     }
 

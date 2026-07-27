@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -129,9 +130,24 @@ public class MemberCouponEntity extends BaseEntity {
         return discount;
     }
 
-    /** 주문 취소/결제 실패 시 사용을 되돌린다. */
-    public void cancelUse() {
+    /**
+     * <b>지정한 주문에 대한</b> 사용을 되돌린다. (주문 취소/결제 실패 시)
+     *
+     * <p>주문 ID 를 대조하지 않고 되돌리면, 주문 A 의 취소가 주문 B 에 사용된 쿠폰까지
+     * 되살릴 수 있다. 그래서 {@code usedOrderId} 가 일치할 때만 되돌린다.
+     *
+     * <p><b>멱등:</b> 이미 미사용이거나 다른 주문에 사용된 쿠폰이면 아무것도 하지 않는다.
+     * 취소 이벤트가 재전송돼도 상태가 흔들리지 않는다.
+     *
+     * @param orderId 취소 대상 주문 ID
+     * @return 실제로 되돌렸으면 true, 되돌릴 것이 없었으면 false
+     */
+    public boolean cancelUseFor(Long orderId) {
+        if (!isUsed() || !Objects.equals(this.usedOrderId, orderId)) {
+            return false;
+        }
         this.usedAt = null;
         this.usedOrderId = null;
+        return true;
     }
 }
