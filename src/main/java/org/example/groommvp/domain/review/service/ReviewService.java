@@ -1,6 +1,8 @@
 package org.example.groommvp.domain.review.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.groommvp.domain.order.entity.OrderStatus;
+import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.review.dto.ReviewRequest;
 import org.example.groommvp.domain.review.dto.ReviewResponse;
 import org.example.groommvp.domain.review.dto.ReviewUpdateRequest;
@@ -19,13 +21,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReviewService {
     private final ReviewRepository reviewRepository;
+    private final OrderItemRepository orderItemRepository;
 
     @Transactional
     public ReviewResponse createReview(ReviewRequest reviewRequest, Long loginMemberId) {
         Long productId = reviewRequest.getProductId();
 
-        // 해당 회원이 이 상품을 결제 완료했는지 확인
-        //validateCompletedPayment(loginMemberId, productId);
+        //해당 회원이 이 상품을 결제 완료했는지 확인
+        validateCompletedPayment(loginMemberId, productId);
 
         // 삭제되지 않은 기존 리뷰가 있는지 확인
         boolean alreadyExists =
@@ -91,6 +94,23 @@ public class ReviewService {
     private void validateReviewOwner(ReviewEntity review, Long loginMemberId) {
         if (loginMemberId == null || !review.getMemberId().equals(loginMemberId)) {
             throw new BusinessException(ErrorCode.REVIEW_FORBIDDEN);
+        }
+    }
+
+    // 구매자 + 결제완료(COMPLETED) 상태인 주문이 있는 경우에만 리뷰 작성 허용
+    private void validateCompletedPayment(Long loginMemberId, Long productId) {
+        if (loginMemberId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+
+        boolean purchased = orderItemRepository.existsByMemberIdAndProductIdAndOrderStatus(
+                loginMemberId,
+                productId,
+                OrderStatus.COMPLETED
+        );
+
+        if (!purchased) {
+            throw new BusinessException(ErrorCode.REVIEW_PURCHASE_REQUIRED);
         }
     }
 }

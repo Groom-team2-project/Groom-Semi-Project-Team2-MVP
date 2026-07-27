@@ -34,6 +34,9 @@ dependencies {
     // Spring Cache + Redis: 조회 캐싱/무효화 (파트 E)
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+    // Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 

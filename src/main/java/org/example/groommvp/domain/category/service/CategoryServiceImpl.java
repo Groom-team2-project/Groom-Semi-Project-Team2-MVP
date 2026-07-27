@@ -70,7 +70,7 @@ public class CategoryServiceImpl implements CategoryService{
         CategoryEntity category = categoryRepository.findById(categoryId)
                 .orElseThrow(()->new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
         //카테고리명 중복 확인
-        if (categoryRepository.existsByCategoryName(categoryName)) {
+        if (categoryRepository.existsByCategoryNameAndCategoryIdNot(categoryName, categoryId)) {
             throw new BusinessException(ErrorCode.CATEGORY_NAME_DUPLICATED);
         }
 
@@ -124,20 +124,32 @@ public class CategoryServiceImpl implements CategoryService{
         CategoryEntity category = categoryRepository.findById(categoryId)
                 .orElseThrow(()-> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
 
+        //대분류의 중분류
         if (category.getParentCategory() == null) {
             List<CategoryChildResponse> children = categoryRepository
                     .findAllByParentCategoryOrderByCategoryIdAsc(category)
                     .stream()
                     .map(CategoryChildResponse::from)
                     .toList();
+
+            if (children.isEmpty()) {
+                throw new BusinessException(ErrorCode.CONTENT_NOT_FOUND);
+            }
+
             return CategoryDetailResponse.of(category, children);
         }
 
+        //중분류의 상품
         List<ProductChildResponse> children = productRepository
                 .findAllByCategoryAndDeletedAtIsNullOrderByProductIdAsc(category)
                 .stream()
                 .map(ProductChildResponse::from)
                 .toList();
+
+        if (children.isEmpty()) {
+            throw new BusinessException(ErrorCode.CONTENT_NOT_FOUND);
+        }
+
         return CategoryDetailResponse.of(category, children);
     }
 }
