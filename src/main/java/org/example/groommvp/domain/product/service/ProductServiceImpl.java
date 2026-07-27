@@ -1,7 +1,6 @@
 package org.example.groommvp.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.groommvp.domain.category.dto.CategoryResponse;
 import org.example.groommvp.domain.category.entity.CategoryEntity;
 import org.example.groommvp.domain.category.repository.CategoryRepository;
 import org.example.groommvp.domain.product.dto.*;
@@ -129,8 +128,8 @@ public class ProductServiceImpl implements ProductService{
     @Override
     public Page<ProductListResponse> getProductList(String keyword, Pageable pageable) {
         //검색어가 있으면 검색해서 페이징
-        if(keyword != null && !keyword.trim().isEmpty()) {
-            return productRepository.findByProductNameContaining(keyword, pageable)
+        if(keyword != null && keyword.isBlank()) {
+            return productRepository.findByProductNameContaining(keyword.trim(), pageable)
                     .map(ProductListResponse::from);
         }
 
