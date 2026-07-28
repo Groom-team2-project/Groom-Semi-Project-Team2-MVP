@@ -171,10 +171,12 @@ public class ProductServiceImpl implements ProductService{
 
     private Sort resolveSort(ProductSortType sortType) {
         return switch (sortType) {
-            case VIEW_COUNT -> Sort.by(Sort.Direction.DESC, "viewCount");
-            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "productPrice");
-            case PRICE_DESC -> Sort.by(Sort.Direction.DESC, "productPrice");
-            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+            case VIEW_COUNT -> Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "productId"));
+            case PRICE_ASC ->
+                    Sort.by(Sort.Direction.ASC, "productPrice").and(Sort.by(Sort.Direction.DESC, "productId"));
+            case PRICE_DESC ->
+                    Sort.by(Sort.Direction.DESC, "productPrice").and(Sort.by(Sort.Direction.DESC, "productId"));
+            default -> Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "productId"));
         };
     }
 }
