@@ -126,6 +126,8 @@ public class ProductServiceImpl implements ProductService{
         List<ImageEntity> images = imageRepository
                 .findAllByProductProductIdOrderByImageIdAsc(productId);
 
+        productRepository.incrementViewCount(productId); //조회수 추가
+
         return ProductDetailResponse.from(product, stock, images);
     }
 
