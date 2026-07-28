@@ -114,6 +114,7 @@ public class ProductServiceImpl implements ProductService{
 
     //상품 단건 조회
     @Override
+    @Transactional
     public ProductDetailResponse getProduct(Long productId) {
         ProductEntity product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)); //등록되지 않은 상품
