@@ -74,13 +74,13 @@ public class PaymentServiceTest {
 		given(paymentRepository.saveAndFlush(any(Payment.class))).willAnswer(inv -> inv.getArgument(0));
 
 		// when
-		PaymentResponse response = paymentService.pay(orderId, new PaymentRequest("test_pk_123", "CARD"));
+		PaymentResponse response = paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_1_1700000000000", "CARD"));
 
 		// then
 		assertThat(response.status()).isEqualTo(PaymentStatus.PAID);
 		assertThat(response.paidAt()).isNotNull();
 
-		verify(tossPaymentClient).confirm("test_pk_123", "ORDER_1", 20000L);  // 서버 금액으로 승인 요청했는지
+		verify(tossPaymentClient).confirm("test_pk_123", "ORDER_1_1700000000000", 20000L);  // 서버 금액으로 승인 요청했는지
 		verify(paymentRepository).saveAndFlush(any(Payment.class));
 
 		ArgumentCaptor<StockHistoryEntity> historyCaptor = ArgumentCaptor.forClass(StockHistoryEntity.class);
@@ -108,7 +108,7 @@ public class PaymentServiceTest {
 		given(paymentRepository.existsByOrder(order)).willReturn(true);
 
 		// when & then
-		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "CARD")))
+		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_1_1700000000000", "CARD")))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ALREADY_EXISTS);
 
@@ -130,7 +130,7 @@ public class PaymentServiceTest {
 			.when(tossPaymentClient).confirm(anyString(), anyString(), anyLong());
 
 		// when & then
-		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "CARD")))
+		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_1_1700000000000", "CARD")))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_FAILED);
 
@@ -138,6 +138,50 @@ public class PaymentServiceTest {
 		assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
 		verify(paymentRepository, never()).saveAndFlush(any());
 		verify(stockHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	@DisplayName("다른 주문의 주문번호로 결제하려 하면 토스 호출 없이 거부된다")
+	void pay_orderIdMismatch() {
+		// given: 주문 1번을 결제하는데 주문번호는 2번 것
+		Long orderId = 1L;
+		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
+		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+		given(paymentRepository.existsByOrder(order)).willReturn(false);
+
+		// when & then
+		assertThatThrownBy(() ->
+			paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_2_1700000000000", "CARD")))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+		verify(tossPaymentClient, never()).confirm(any(), any(), anyLong());
+	}
+
+	@Test
+	@DisplayName("결제 재시도 시 새 주문번호로 승인 요청한다 (토스 orderId 재사용 불가 대응)")
+	void pay_retryUsesNewOrderId() {
+		// given
+		Long orderId = 1L;
+		Long productId = 10L;
+		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
+		ProductEntity product = product(productId);
+		OrderItem orderItem = new OrderItem(order, product, 1, 20000);
+		StockEntity stock = StockEntity.builder().product(product).stocks(1).build();
+		stock.reserve(1);
+
+		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
+		given(paymentRepository.existsByOrder(order)).willReturn(false);
+		given(orderItemRepository.findByOrderIdWithProduct(orderId)).willReturn(List.of(orderItem));
+		given(stockRepository.findByProductIdWithPessimisticLock(productId)).willReturn(Optional.of(stock));
+		given(paymentRepository.saveAndFlush(any(Payment.class))).willAnswer(inv -> inv.getArgument(0));
+
+		// when: 첫 시도가 실패한 뒤 새 주문번호로 재시도한 상황
+		String retryOrderId = "ORDER_1_1700000009999";
+		paymentService.pay(orderId, new PaymentRequest("test_pk_retry", retryOrderId, "CARD"));
+
+		// then: 이전 주문번호가 아니라 재시도 주문번호로 승인해야 한다
+		verify(tossPaymentClient).confirm("test_pk_retry", retryOrderId, 20000L);
 	}
 
 	@Test

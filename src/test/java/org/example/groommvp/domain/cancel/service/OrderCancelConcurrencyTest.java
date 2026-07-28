@@ -51,54 +51,8 @@ class OrderCancelConcurrencyTest {
         productRepository.deleteAllInBatch();
     }
 
-    @Test
-    @DisplayName("같은 주문에 동시에 100개 취소 요청이 와도 딱 1번만 취소되고 재고도 1번만 복구된다")
-    void concurrentCancel_onlyOnce() throws InterruptedException {
-        // given: 상품 / 재고(0) / 주문(COMPLETED) / 주문품목(2개) 준비
-        ProductEntity product = productRepository.save(ProductEntity.builder().productName("Test Product").productPrice(10000).build());
-        stockRepository.save(new StockEntity(product, 0));                 // 취소 전 재고 0
-        Long memberId = 100L;
-        Order order = orderRepository.save(new Order(memberId, 20000L));   // COMPLETED 주문
-        orderItemRepository.save(new OrderItem(order, product, 2, 10000)); // 2개 구매했던 품목
-        Long orderId = order.getId();
-
-        int threadCount = 100;
-        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch startLatch = new CountDownLatch(1);        // 출발 신호총
-        CountDownLatch doneLatch = new CountDownLatch(threadCount); // 100개 완료 대기
-        AtomicInteger successCount = new AtomicInteger();
-        AtomicInteger failCount = new AtomicInteger();
-
-        // 100개 스레드가 동시에 같은 주문을 취소 시도
-        for (int i = 0; i < threadCount; i++) {
-            executorService.submit(() -> {
-                try {
-                    startLatch.await();                  // 신호총 울릴 때까지 대기
-                    orderCancelService.cancel(orderId, memberId);
-                    successCount.incrementAndGet();      // 취소 성공
-                } catch (BusinessException e) {
-                    failCount.incrementAndGet();         // 중복 취소로 차단됨
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    doneLatch.countDown();
-                }
-            });
-        }
-
-        startLatch.countDown();                          // 탕! 100개 동시 출발
-        assertThat(doneLatch.await(10, TimeUnit.SECONDS)).isTrue();
-        executorService.shutdown();
-
-        // then: 락 덕분에 딱 1번만 성공, 나머지 99개는 중복 취소로 차단
-        assertThat(successCount.get()).isEqualTo(1);
-        assertThat(failCount.get()).isEqualTo(99);
-
-        Order canceled = orderRepository.findById(orderId).orElseThrow();
-        assertThat(canceled.getStatus()).isEqualTo(OrderStatus.CANCELED);        // 취소됨
-        assertThat(stockRepository.findAll().get(0).getStocks()).isEqualTo(2);   // 0 + 2, 딱 1번 복구
-        assertThat(stockHistoryRepository.count()).isEqualTo(1);                 // RESTORE 이력 1건뿐
-    }
+    // 결제 완료 주문은 취소 API로 취소할 수 없고(환불 API로만 처리) 아래 결제 대기 케이스가
+    // 동일한 동시성 보장(요청 100개 중 1건만 성공)을 검증하므로, COMPLETED 동시 취소 테스트는 제거했다.
 
     @Test
     @DisplayName("PENDING_PAYMENT 주문에 취소 요청 100개가 와도 예약은 한 번만 해제된다")

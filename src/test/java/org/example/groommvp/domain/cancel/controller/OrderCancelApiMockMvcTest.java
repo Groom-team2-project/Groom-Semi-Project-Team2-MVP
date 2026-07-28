@@ -82,7 +82,7 @@ class OrderCancelApiMockMvcTest {
     void cancelOtherMembersOrderReturnsForbidden() throws Exception {
         MemberEntity owner = saveMember("owner-provider", "owner@example.com", "owner");
         MemberEntity requester = saveMember("requester-provider", "requester@example.com", "requester");
-        OrderFixture fixture = saveCompletedOrder(owner.getMemberId());
+        OrderFixture fixture = savePendingOrder(owner.getMemberId());
         String accessToken = jwtTokenProvider.createAccessToken(requester);
 
         mockMvc.perform(post("/api/v1/orders/{orderId}/cancel", fixture.order().getId())
@@ -93,8 +93,9 @@ class OrderCancelApiMockMvcTest {
 
         Order savedOrder = orderRepository.findById(fixture.order().getId()).orElseThrow();
         StockEntity savedStock = stockRepository.findById(fixture.stock().getStockId()).orElseThrow();
-        assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.COMPLETED);
-        assertThat(savedStock.getStocks()).isEqualTo(8);
+        assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);  // 취소되지 않음
+        assertThat(savedStock.getStocks()).isEqualTo(10);
+        assertThat(savedStock.getReservedStocks()).isEqualTo(2);                    // 예약 유지
         assertThat(stockHistoryRepository.count()).isZero();
     }
 
@@ -102,7 +103,7 @@ class OrderCancelApiMockMvcTest {
     @DisplayName("본인 토큰으로 주문 취소를 요청하면 200을 반환한다")
     void cancelOwnOrderReturnsOk() throws Exception {
         MemberEntity owner = saveMember("owner-provider", "owner@example.com", "owner");
-        OrderFixture fixture = saveCompletedOrder(owner.getMemberId());
+        OrderFixture fixture = savePendingOrder(owner.getMemberId());
         String accessToken = jwtTokenProvider.createAccessToken(owner);
 
         mockMvc.perform(post("/api/v1/orders/{orderId}/cancel", fixture.order().getId())
@@ -115,10 +116,11 @@ class OrderCancelApiMockMvcTest {
         Order savedOrder = orderRepository.findById(fixture.order().getId()).orElseThrow();
         StockEntity savedStock = stockRepository.findById(fixture.stock().getStockId()).orElseThrow();
         assertThat(savedOrder.getStatus()).isEqualTo(OrderStatus.CANCELED);
-        assertThat(savedStock.getStocks()).isEqualTo(10);
+        assertThat(savedStock.getStocks()).isEqualTo(10);          // 결제 전이라 실재고는 그대로
+        assertThat(savedStock.getReservedStocks()).isZero();       // 예약만 해제
         assertThat(stockHistoryRepository.count()).isEqualTo(1);
         assertThat(stockHistoryRepository.findAll().getFirst().getChangeType())
-                .isEqualTo(StockHistoryType.RESTORE);
+                .isEqualTo(StockHistoryType.RELEASE);
     }
 
     private MemberEntity saveMember(String providerId, String email, String nickname) {
@@ -127,15 +129,18 @@ class OrderCancelApiMockMvcTest {
         );
     }
 
-    private OrderFixture saveCompletedOrder(Long memberId) {
+    /** 취소 API가 다루는 대상: 결제 대기 주문(재고 2개 예약된 상태) */
+    private OrderFixture savePendingOrder(Long memberId) {
         ProductEntity product = productRepository.save(
                 ProductEntity.builder()
                         .productName("Cancel API Product")
                         .productPrice(10000)
                         .build()
         );
-        StockEntity stock = stockRepository.save(new StockEntity(product, 8));
-        Order order = orderRepository.save(new Order(memberId, 20000L));
+        StockEntity stock = new StockEntity(product, 10);
+        stock.reserve(2);
+        stockRepository.save(stock);
+        Order order = orderRepository.save(Order.pendingPayment(memberId, 20000L));
         orderItemRepository.save(new OrderItem(order, product, 2, 10000));
         return new OrderFixture(order, stock);
     }

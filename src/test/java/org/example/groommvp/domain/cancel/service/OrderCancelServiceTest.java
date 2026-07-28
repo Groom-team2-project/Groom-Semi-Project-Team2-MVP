@@ -44,33 +44,25 @@ class OrderCancelServiceTest {
 	@InjectMocks private OrderCancelService orderCancelService;
 
 	@Test
-	@DisplayName("주문을 취소하면 상태가 CANCELED로 바뀌고 재고가 복구된다")
-	void cancel_success() {
-		// given
+	@DisplayName("결제 완료 주문은 취소 API로 취소할 수 없고 환불로 안내된다")
+	void cancel_completedOrder_requiresRefund() {
+		// given: 결제까지 끝난 주문
+		//        여기서 취소되면 재고는 복구되지만 토스 결제가 취소되지 않아 금액이 환불되지 않는다.
 		Long orderId = 1L;
 		Long memberId = 100L;
-		ProductEntity product = product(10L, "티셔츠", 10000);
-		Order order = order(orderId, memberId);                          // COMPLETED 주문
-		OrderItem orderItem = new OrderItem(order, product, 2, 10000);   // 2개 샀던 품목
-		StockEntity stock = StockEntity.builder().product(product).stocks(8).build(); // 현재 재고 8
+		Order order = order(orderId, memberId);   // COMPLETED 주문
 
 		given(orderRepository.findByIdWithPessimisticLock(orderId)).willReturn(Optional.of(order));
-		given(orderItemRepository.findByOrder(order)).willReturn(List.of(orderItem));
-		given(stockRepository.findByProductIdWithPessimisticLock(10L)).willReturn(Optional.of(stock));
-		given(stockHistoryRepository.save(any(StockHistoryEntity.class)))
-			.willAnswer(invocation -> invocation.getArgument(0));
 
-		// when
-		OrderCancelResponse response = orderCancelService.cancel(orderId, memberId);
+		// when & then
+		assertThatThrownBy(() -> orderCancelService.cancel(orderId, memberId))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(ErrorCode.ORDER_REFUND_REQUIRED);
 
-		// then
-		assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);  // 상태 변경됨
-		assertThat(order.getCanceledAt()).isNotNull();                  // 취소 시각 기록됨
-		assertThat(stock.getStocks()).isEqualTo(10);           // 8 + 2 = 재고 복구됨
-		assertThat(response.restoredItems()).hasSize(1);
-		assertThat(response.restoredItems().get(0).productId()).isEqualTo(10L);
-		assertThat(response.restoredItems().get(0).quantity()).isEqualTo(2);
-		verify(stockHistoryRepository).save(any(StockHistoryEntity.class)); // RESTORE 이력 저장됨
+		// 주문 상태도, 재고도 건드리지 않아야 한다
+		assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
+		verify(stockHistoryRepository, never()).save(any());
 	}
 
 	@Test
