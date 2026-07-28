@@ -2,7 +2,6 @@ package org.example.groommvp.domain.product.service;
 
 import org.example.groommvp.domain.product.dto.*;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 public interface ProductService {
 
