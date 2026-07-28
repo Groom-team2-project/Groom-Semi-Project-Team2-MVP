@@ -47,6 +47,10 @@ public class ProductEntity extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    //조회수
+    @Column(name = "view_count", nullable = false)
+    private Long viewCount = 0L;
+
     @Builder
     public ProductEntity(
             String productName,
