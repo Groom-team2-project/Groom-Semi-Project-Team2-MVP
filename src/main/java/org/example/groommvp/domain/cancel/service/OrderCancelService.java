@@ -55,6 +55,13 @@ public class OrderCancelService {
             throw new BusinessException(ErrorCode.ORDER_FORBIDDEN);
         }
 
+        // 2. 결제 완료 주문은 이 API로 취소할 수 없다.
+        //    여기서 취소하면 재고는 복구되지만 토스 결제가 취소되지 않아 결제 금액이 환불되지 않는다.
+        //    결제 취소까지 수행하는 환불 API(POST /orders/{orderId}/payments/refund)로만 처리한다.
+        if (order.getStatus().isCompleted()) {
+            throw new BusinessException(ErrorCode.ORDER_REFUND_REQUIRED);
+        }
+
         OrderStatus previousStatus = order.getStatus(); // 취소하기 전 상태 기억
 
         // 2. 취소
