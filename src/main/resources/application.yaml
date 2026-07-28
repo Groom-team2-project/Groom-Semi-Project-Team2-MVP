@@ -64,6 +64,6 @@ app:
     oauth:
         cookie-secure: ${OAUTH_COOKIE_SECURE:true}
     storage:
-        bucket: ${AWS_S3_BUCKET} #버킷이름
-        region: ${AWS_REGION:us-west-2} #버킷리전
-        public-base-url: ${IMAGE_PUBLIC_BASE_URL} #이미지를 조회할 기본 주소 https://goorm-dev-mmy.s3.us-west-2.amazonaws.com
+        bucket: goorm-dev-mmy #버킷이름
+        region: us-west-2 #버킷리전
+        public-base-url: https://goorm-dev-mmy.s3.us-west-2.amazonaws.com #이미지를 조회할 기본 주소
