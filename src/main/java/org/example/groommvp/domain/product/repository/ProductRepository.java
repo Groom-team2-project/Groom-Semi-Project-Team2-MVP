@@ -14,16 +14,12 @@ import java.util.List;
 
 public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
-    //상품 이름으로 검색
-    Page<ProductEntity> findByProductNameContaining(String keyword, Pageable pageable);
-
     List<ProductEntity> findAllByCategoryAndDeletedAtIsNullOrderByProductIdAsc(CategoryEntity category);
 
     //카테고리 삭제 전 연결 확인
     boolean existsByCategory(CategoryEntity category);
 
-    //일반 목록 조회 (최신순/조회수순/가격순 전부 여기 사용, keyword/categoryId는 null이면 조건 무시)
-    //Pageable에 Sort를 넣으면 여기 order by 없이도 자동으로 정렬 적용됨
+    //일반 목록 조회 (최신순/조회수순/가격순, keyword/categoryId는 null이면 조건 무시)
     @Query(value = """
             select p from ProductEntity p
             where p.deletedAt is null
@@ -68,6 +64,6 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
     @Modifying
     @Query("update ProductEntity p set p.viewCount = p.viewCount + 1 where p.productId = :productId")
-    int incrementViewCount(@Param("productId") Long productId);
+    void incrementViewCount(@Param("productId") Long productId);
 
 }

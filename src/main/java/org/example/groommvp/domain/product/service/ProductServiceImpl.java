@@ -132,7 +132,7 @@ public class ProductServiceImpl implements ProductService{
         return ProductDetailResponse.from(product, stock, images);
     }
 
-    //상품 목록 조회 (검색 + 카테고리필터 + 정렬 + 재고 일괄조회)
+    //상품 목록 조회
     @Override
     public Page<ProductListResponse> getProductList(
             String keyword, Long categoryId, ProductSortType sortType, int page, int size
@@ -144,7 +144,7 @@ public class ProductServiceImpl implements ProductService{
 
         if (sort == ProductSortType.POPULAR) {
             // 인기순은 결제완료 주문건수 집계가 필요해서 별도 쿼리로 처리
-            Pageable pageable = PageRequest.of(page, size); // Sort 없이! 여기 JPQL의 order by가 정렬 담당
+            Pageable pageable = PageRequest.of(page, size);
             productPage = productRepository.findAllOrderByCompletedOrderCountDesc(
                     normalizedKeyword, categoryId, OrderStatus.COMPLETED, pageable);
         } else {
@@ -154,7 +154,7 @@ public class ProductServiceImpl implements ProductService{
                     normalizedKeyword, categoryId, pageable);
         }
 
-        // 재고는 상품마다 따로 조회하지 않고, 이 페이지에 나온 상품들의 재고를 한 번에 묶어서 조회
+        // 재고 조회
         List<Long> productIds = productPage.getContent().stream()
                 .map(ProductEntity::getProductId)
                 .toList();
