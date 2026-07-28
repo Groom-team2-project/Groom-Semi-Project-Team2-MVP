@@ -40,3 +40,31 @@ Docker Desktop을 실행한 뒤 프로젝트 루트에서 다음 명령을 사�
 
 이 측정은 로컬 단일 호스트의 엔드투엔드 비교다. 여러 애플리케이션 인스턴스를 조정하는
 분산락의 운영상 장점이나 실제 네트워크 지연을 완전히 재현하지 않는다.
+
+## 멀티 인스턴스 비교
+
+멀티 인스턴스 측정은 다음 구조를 자동으로 구성한다.
+
+```text
+k6 -> Nginx:18080 -> app-1:8080 / app-2:8080 -> MySQL + Redis
+```
+
+Docker Desktop을 실행한 뒤 다음 명령으로 시작한다.
+
+```powershell
+.\performance\run-multi-instance-comparison.ps1
+```
+
+기본 포트는 Nginx `18080`, 앱 확인용 `18081`, `18082`다. 포트나 부하는 인자로 바꿀 수 있다.
+
+```powershell
+.\performance\run-multi-instance-comparison.ps1 `
+  -Vus 100 `
+  -Iterations 500 `
+  -Runs 3 `
+  -GatewayPort 18080
+```
+
+실행기는 비관적 락과 분산락을 차례로 측정하고 Nginx가 두 앱에 요청을 보냈는지도 확인한다.
+결과는 `docs/event-lock-multi-instance-performance-report.md`에 생성된다. 기본적으로 측정이
+끝나면 앱 두 개와 Nginx만 중지하며 MySQL과 Redis는 계속 실행한다.
