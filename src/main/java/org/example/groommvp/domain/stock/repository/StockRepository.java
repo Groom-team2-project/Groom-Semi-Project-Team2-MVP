@@ -1,5 +1,6 @@
 package org.example.groommvp.domain.stock.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.example.groommvp.domain.stock.entity.StockEntity;
@@ -17,4 +18,6 @@ public interface StockRepository extends JpaRepository<StockEntity, Long> {
     Optional<StockEntity> findByProductIdWithPessimisticLock(@Param("productId") Long productId);
 
     Optional<StockEntity> findByProduct_ProductId(Long productId);
+
+    Optional<StockEntity> findAllByProduct_ProductIdIn(List<Long> productIds);
 }

@@ -13,10 +13,7 @@ import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.service.ProductService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.example.groommvp.global.response.ErrorResponse;
-import org.example.groommvp.global.response.SwaggerResponse;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -291,10 +288,15 @@ public class ProductController {
             @Parameter(description = "페이지 크기", example = "10")
             @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "상품명 검색 키워드 (선택)")
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "카테고리 ID로 필터링 (선택)")
+            @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "정렬 기준 (선택, 기본값 latest): latest, popular, view_count, price_asc, price_desc")
+            @RequestParam(required = false) String sort
     ){
-        Pageable pageable = PageRequest.of(page, size);
-        Page<ProductListResponse> productPage = productService.getProductList(keyword, pageable);
+        ProductSortType sortType = ProductSortType.from(sort);
+        Page<ProductListResponse> productPage =
+                productService.getProductList(keyword, categoryId, sortType, page, size);
 
         PageResponse<ProductListResponse> pageData = PageResponse.from(productPage);
 

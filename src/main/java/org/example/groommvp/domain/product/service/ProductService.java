@@ -18,5 +18,5 @@ public interface ProductService {
     //상품 단건 조회
     ProductDetailResponse getProduct(Long productId);
 
-    Page<ProductListResponse> getProductList(String keyword, Pageable pageable);
+    Page<ProductListResponse> getProductList(String keyword, Long categoryId, ProductSortType sortType, int page, int size);
 }

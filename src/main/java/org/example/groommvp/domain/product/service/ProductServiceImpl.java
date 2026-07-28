@@ -3,6 +3,7 @@ package org.example.groommvp.domain.product.service;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.category.entity.CategoryEntity;
 import org.example.groommvp.domain.category.repository.CategoryRepository;
+import org.example.groommvp.domain.order.entity.OrderStatus;
 import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.entity.ImageEntity;
 import org.example.groommvp.domain.product.repository.ImageRepository;
@@ -12,12 +13,15 @@ import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.example.groommvp.domain.product.entity.ProductEntity;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -125,15 +129,49 @@ public class ProductServiceImpl implements ProductService{
         return ProductDetailResponse.from(product, stock, images);
     }
 
+    //상품 목록 조회 (검색 + 카테고리필터 + 정렬 + 재고 일괄조회)
     @Override
-    public Page<ProductListResponse> getProductList(String keyword, Pageable pageable) {
-        //검색어가 있으면 검색해서 페이징
-        if(keyword != null && keyword.isBlank()) {
-            return productRepository.findByProductNameContaining(keyword.trim(), pageable)
-                    .map(ProductListResponse::from);
+    public Page<ProductListResponse> getProductList(
+            String keyword, Long categoryId, ProductSortType sortType, int page, int size
+    ) {
+        ProductSortType sort = sortType != null ? sortType : ProductSortType.LATEST;
+        String normalizedKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+
+        Page<ProductEntity> productPage;
+
+        if (sort == ProductSortType.POPULAR) {
+            // 인기순은 결제완료 주문건수 집계가 필요해서 별도 쿼리로 처리
+            Pageable pageable = PageRequest.of(page, size); // Sort 없이! 여기 JPQL의 order by가 정렬 담당
+            productPage = productRepository.findAllOrderByCompletedOrderCountDesc(
+                    normalizedKeyword, categoryId, OrderStatus.COMPLETED, pageable);
+        } else {
+            // 최신순/조회수순/가격순은 컬럼 하나 기준 정렬이라 Sort로 처리
+            Pageable pageable = PageRequest.of(page, size, resolveSort(sort));
+            productPage = productRepository.findAllByKeywordAndCategory(
+                    normalizedKeyword, categoryId, pageable);
         }
 
-        return productRepository.findAll(pageable)
-                .map(ProductListResponse::from);
+        // 재고는 상품마다 따로 조회하지 않고, 이 페이지에 나온 상품들의 재고를 한 번에 묶어서 조회
+        List<Long> productIds = productPage.getContent().stream()
+                .map(ProductEntity::getProductId)
+                .toList();
+
+        Map<Long, Integer> stocksByProductId = stockRepository.findAllByProduct_ProductIdIn(productIds).stream()
+                .collect(Collectors.toMap(
+                        s -> s.getProduct().getProductId(),
+                        StockEntity::getStocks
+                ));
+
+        return productPage.map(product ->
+                ProductListResponse.from(product, stocksByProductId.get(product.getProductId())));
+    }
+
+    private Sort resolveSort(ProductSortType sortType) {
+        return switch (sortType) {
+            case VIEW_COUNT -> Sort.by(Sort.Direction.DESC, "viewCount");
+            case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "productPrice");
+            case PRICE_DESC -> Sort.by(Sort.Direction.DESC, "productPrice");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
     }
 }
