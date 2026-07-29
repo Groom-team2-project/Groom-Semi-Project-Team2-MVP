@@ -71,7 +71,7 @@ public class PaymentService {
 		}
 
 		// 3단계 — 승인 성공을 반영한다.
-		Payment payment = paymentAttemptService.complete(orderId, started.attemptId(), request);
+		Payment payment = paymentAttemptService.complete(orderId, started.attemptId());
 		return PaymentResponse.from(payment);
 	}
 

@@ -82,7 +82,7 @@ class PaymentServiceTest {
 		// begin 이 서버가 보관한 주문 금액을 돌려준다
 		given(paymentAttemptService.begin(orderId, request))
 			.willReturn(new PaymentAttemptStarted(99L, 20000L));
-		given(paymentAttemptService.complete(orderId, 99L, request)).willReturn(payment);
+		given(paymentAttemptService.complete(orderId, 99L)).willReturn(payment);
 
 		// when
 		PaymentResponse response = paymentService.pay(orderId, request);
@@ -94,7 +94,7 @@ class PaymentServiceTest {
 		InOrder order1 = inOrder(paymentAttemptService, tossPaymentClient);
 		order1.verify(paymentAttemptService).begin(orderId, request);
 		order1.verify(tossPaymentClient).confirm("test_pk_123", TOSS_ORDER_ID, 20000L);
-		order1.verify(paymentAttemptService).complete(orderId, 99L, request);
+		order1.verify(paymentAttemptService).complete(orderId, 99L);
 
 		verify(paymentAttemptService, never()).revert(anyLong(), anyLong(), anyString());
 	}
@@ -117,7 +117,7 @@ class PaymentServiceTest {
 
 		// 주문을 취소하지 않고 결제 대기로 되돌려 재시도할 수 있게 한다
 		verify(paymentAttemptService).revert(eq(orderId), eq(99L), anyString());
-		verify(paymentAttemptService, never()).complete(anyLong(), anyLong(), any());
+		verify(paymentAttemptService, never()).complete(anyLong(), anyLong());
 	}
 
 	@Test
@@ -135,7 +135,7 @@ class PaymentServiceTest {
 			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ALREADY_EXISTS);
 
 		verify(tossPaymentClient, never()).confirm(any(), any(), anyLong());
-		verify(paymentAttemptService, never()).complete(anyLong(), anyLong(), any());
+		verify(paymentAttemptService, never()).complete(anyLong(), anyLong());
 	}
 
 	@Test

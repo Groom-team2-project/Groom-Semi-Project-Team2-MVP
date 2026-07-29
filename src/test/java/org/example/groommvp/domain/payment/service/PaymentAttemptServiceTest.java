@@ -165,7 +165,7 @@ class PaymentAttemptServiceTest {
 		given(paymentAttemptRepository.findById(99L)).willReturn(Optional.of(attempt));
 
 		// when
-		Payment payment = paymentAttemptService.complete(ORDER_ID, 99L, REQUEST);
+		Payment payment = paymentAttemptService.complete(ORDER_ID, 99L);
 
 		// then
 		assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PAID);

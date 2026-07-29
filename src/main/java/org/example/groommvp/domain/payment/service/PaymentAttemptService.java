@@ -11,6 +11,7 @@ import org.example.groommvp.domain.payment.dto.PaymentAttemptStarted;
 import org.example.groommvp.domain.payment.dto.PaymentRequest;
 import org.example.groommvp.domain.payment.entity.Payment;
 import org.example.groommvp.domain.payment.entity.PaymentAttempt;
+import org.example.groommvp.domain.payment.event.PaymentCompletedEvent;
 import org.example.groommvp.domain.payment.repository.PaymentAttemptRepository;
 import org.example.groommvp.domain.payment.repository.PaymentRepository;
 import org.example.groommvp.domain.stock.entity.StockEntity;
@@ -97,9 +98,13 @@ public class PaymentAttemptService {
 	 * 3단계(성공): 승인 결과를 반영한다.
 	 *
 	 * <p>예약 재고를 확정하고 주문을 완료 처리한 뒤 결제와 시도 이력을 저장한다.
+	 * 결제 수단·결제 키는 시도 이력에서 읽어, 정산도 같은 경로로 완료 처리할 수 있게 한다.
 	 */
 	@Transactional
-	public Payment complete(Long orderId, Long attemptId, PaymentRequest request) {
+	public Payment complete(Long orderId, Long attemptId) {
+		PaymentAttempt attempt = paymentAttemptRepository.findById(attemptId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
 		Order order = orderRepository.findByIdWithPessimisticLock(orderId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
 
@@ -108,7 +113,7 @@ public class PaymentAttemptService {
 		order.completePayment();
 
 		Payment payment = new Payment(
-			order, order.getTotalPrice(), request.method(), request.paymentKey());
+			order, order.getTotalPrice(), attempt.getMethod(), attempt.getPaymentKey());
 		payment.pay();
 
 		try {
@@ -117,12 +122,64 @@ public class PaymentAttemptService {
 			throw new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS);
 		}
 
-		markAttempt(attemptId, PaymentAttempt::succeed);
+		attempt.succeed();
 
 		eventPublisher.publishEvent(
-			new org.example.groommvp.domain.payment.event.PaymentCompletedEvent(
-				orderId, payment.getId(), payment.getAmount()));
+			new PaymentCompletedEvent(orderId, payment.getId(), payment.getAmount()));
 		return payment;
+	}
+
+	/**
+	 * 정산: 토스에서 결제가 확인된 시도를 처리한다.
+	 *
+	 * <p>주문을 잠근 뒤 상태를 <b>다시</b> 확인해 결론을 낸다. 이 재확인이 없으면
+	 * 이미 완료된 주문을 또 완료하거나(중복 완료), 살아 있는 주문을 환불해버릴 수 있다.
+	 *
+	 * <p>환불은 외부 호출이라 여기서 하지 않고 {@link PaymentReconcileAction#NEEDS_REFUND}
+	 * 로 알린다. (트랜잭션 안에서 외부 호출을 하지 않는다)
+	 */
+	@Transactional
+	public PaymentReconcileAction settleConfirmedPayment(Long attemptId) {
+		PaymentAttempt attempt = paymentAttemptRepository.findById(attemptId)
+			.orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+
+		if (!attempt.getStatus().isUnresolved()) {
+			return PaymentReconcileAction.SKIPPED;  // 그사이 다른 처리가 끝났다
+		}
+
+		Order order = orderRepository.findByIdWithPessimisticLock(attempt.getOrderId())
+			.orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+
+		// 이미 완료된 주문이면 결제도 저장돼 있다. 중복 완료를 막고 시도만 성공으로 정리한다.
+		if (order.getStatus().isCompleted()) {
+			attempt.succeed();
+			return PaymentReconcileAction.SKIPPED;
+		}
+
+		// 승인 중 상태가 아니면 만료·취소로 예약이 이미 풀렸다는 뜻이다.
+		// 재고를 되돌릴 수 없으므로 받은 돈을 환불해야 한다.
+		if (!order.getStatus().isPaymentProcessing()) {
+			log.warn("결제는 성공했지만 주문이 이미 종료된 상태입니다. 환불이 필요합니다. "
+				+ "orderId={}, status={}", order.getId(), order.getStatus());
+			return PaymentReconcileAction.NEEDS_REFUND;
+		}
+
+		// 예약이 남아 있다 — 원래 하려던 완료 처리를 한 번만 재시도한다.
+		complete(order.getId(), attemptId);
+		return PaymentReconcileAction.COMPLETED;
+	}
+
+	/** 이 시도를 실패로 기록한다. (정산 결과 반영용) */
+	@Transactional
+	public void markFailed(Long attemptId, String reason) {
+		markAttempt(attemptId, attempt -> attempt.fail(reason));
+	}
+
+	/** 결론을 내지 못해 운영 확인이 필요함을 기록한다. */
+	@Transactional
+	public void markNeedsReview(Long attemptId, String reason) {
+		log.error("결제 시도에 운영 확인이 필요합니다. attemptId={}, reason={}", attemptId, reason);
+		markAttempt(attemptId, attempt -> attempt.needsReview(reason));
 	}
 
 	/**
