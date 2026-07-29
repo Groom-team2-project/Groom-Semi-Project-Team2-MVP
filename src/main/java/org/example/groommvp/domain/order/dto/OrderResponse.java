@@ -17,7 +17,18 @@ public record OrderResponse(
         Long totalPrice,
         @Schema(type = "string", description = "주문 취소 시각 (취소되지 않은 주문은 null)", nullable = true, example = "2024-01-15T11:00:00")
         LocalDateTime canceledAt,
-        @Schema(type = "string", description = "주문 생성 시각", example = "2024-01-15T10:30:00")
+        @Schema(
+                type = "string",
+                description = "결제 마감 시각 (결제 대기 주문에만 의미 있음)",
+                nullable = true,
+                example = "2024-01-15T11:00:00"
+        )
+        LocalDateTime paymentExpiresAt,
+        @Schema(
+                type = "string",
+                description = "주문 생성 시각",
+                example = "2024-01-15T10:30:00"
+        )
         LocalDateTime createdAt,
         @Schema(description = "주문 상품 목록")
         List<OrderItemResponse> orderItems
@@ -29,6 +40,7 @@ public record OrderResponse(
                 order.getStatus(),
                 order.getTotalPrice(),
                 order.getCanceledAt(),
+                order.getPaymentExpiresAt(),
                 order.getCreatedAt(),
                 orderItems.stream()
                         .map(OrderItemResponse::from)
