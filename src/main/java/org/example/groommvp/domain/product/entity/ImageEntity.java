@@ -22,8 +22,8 @@ public class ImageEntity extends BaseEntity {
     @JoinColumn(name = "product_id", nullable = false)
     private ProductEntity product;
 
-    @Column(name = "detail_image", nullable = false)
-    private String detailImage;
+    @Column(name = "detail_image", nullable = false, length = 500)
+    private String detailImage; //이미지 url 대신 s3 객체 키 저장
 
     @Builder
     public ImageEntity(
