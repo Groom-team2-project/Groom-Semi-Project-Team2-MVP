@@ -3,11 +3,9 @@ package org.example.groommvp.domain.product.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Getter;
-import org.example.groommvp.domain.product.entity.ImageEntity;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 
-import java.awt.*;
 import java.util.List;
 
 @Schema(description = "상품 상세 응답")
@@ -33,18 +31,19 @@ public class ProductDetailResponse {
 
     private final List<ImageResponse> detailImages;
 
-    public static ProductDetailResponse from(ProductEntity product, StockEntity stock, List<ImageEntity> images) {
+    public static ProductDetailResponse from(
+            ProductEntity product,
+            StockEntity stock,
+            String productImageUrl,
+            List<ImageResponse> detailImages
+    ) {
         return ProductDetailResponse.builder()
                 .productName(product.getProductName())
                 .productPrice(product.getProductPrice())
-                .productImage(product.getProductImage())
+                .productImage(productImageUrl)
                 .stocks(stock.getStocks())
                 .category(product.getCategory().getCategoryId())
-                .detailImages(
-                        images.stream()
-                                .map(ImageResponse::from)
-                                .toList()
-                )
+                .detailImages(detailImages)
                 .build();
     }
 }

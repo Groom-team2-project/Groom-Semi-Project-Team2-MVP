@@ -15,6 +15,7 @@ import org.example.groommvp.domain.product.service.ProductService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.example.groommvp.global.response.ErrorResponse;
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,6 +23,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Product", description = "상품 관리 API")
 @RestController
@@ -69,10 +71,11 @@ public class ProductController {
                                     }
                                     """)))
     })
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommonResponse<ProductResponse>> createProduct(
-            @Valid @RequestBody ProductCreateRequest request) {
-        ProductResponse response = productService.createProduct(request);
+            @Valid @RequestPart("request") ProductCreateRequest request,
+            @RequestPart("productImage") MultipartFile productImage) {
+        ProductResponse response = productService.createProduct(request, productImage);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "상품 등록 성공"));
     }
@@ -173,12 +176,13 @@ public class ProductController {
                                     }
                                     """)))
     })
-    @PutMapping("/{productId}")
+    @PutMapping(value = "/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommonResponse<ProductResponse>> updateProduct(
             @Parameter(description = "상품 ID", example = "1", required = true)
             @PathVariable Long productId,
-            @Valid @RequestBody ProductUpdateRequest request) {
-        ProductResponse response = productService.updateProduct(productId, request);
+            @Valid @RequestPart("request") ProductUpdateRequest request,
+            @RequestPart(value = "productImage", required = false) MultipartFile productImage) {
+        ProductResponse response = productService.updateProduct(productId, request, productImage);
         return ResponseEntity.ok(CommonResponse.success(response, "상품 수정 성공"));
     }
 
