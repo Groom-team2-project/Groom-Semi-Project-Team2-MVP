@@ -30,7 +30,11 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
             select count(p) from ProductEntity p
             where p.deletedAt is null
               and (:keyword is null or p.productName like concat('%', :keyword, '%'))
-              and (:categoryId is null or p.category.categoryId = :categoryId)
+              and (
+                    :categoryId is null
+                    or p.category.categoryId = :categoryId
+                    or p.category.parentCategory.categoryId = :categoryId
+                 )
             """)
     Page<ProductEntity> findAllByKeywordAndCategory(
             @Param("keyword") String keyword,

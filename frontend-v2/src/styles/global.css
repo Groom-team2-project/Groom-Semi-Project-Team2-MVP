@@ -355,3 +355,253 @@ img { max-width: 100%; display: block; }
   .nav-wrap { padding: 10px 8px; }
   .nav-links a:not(.active):not(.keep) { display: none; }
 }
+
+
+
+/* ============ 상품 목록 검색·카테고리·정렬 ============ */
+.catalog-toolbar {
+  margin-bottom: 28px;
+}
+
+.catalog-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  padding-bottom: 20px;
+}
+
+.catalog-category-area {
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.catalog-count {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.catalog-control-panel {
+  padding: 0;
+
+}
+
+.catalog-search {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: min(100%, 470px);
+  margin-bottom: 0;
+}
+
+.catalog-search-input {
+  flex: 1;
+  width: auto;
+  min-width: 220px;
+  border-radius: var(--radius-pill);
+  padding-left: 18px;
+}
+
+.catalog-search-reset {
+  flex-shrink: 0;
+  padding: 7px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.catalog-search-reset {
+  flex-shrink: 0;
+  padding: 7px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.catalog-search-reset:disabled {
+  opacity: 0.3;
+  cursor: default;
+  text-decoration: none;
+}
+
+.catalog-search-reset:hover {
+  color: var(--ink);
+}
+
+.category-filter-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.category-filter-row-child {
+  min-height: 42px;
+  margin-top: 10px;
+  padding-top: 0;
+}
+
+.category-filter-label {
+  flex: 0 0 48px;
+  padding-top: 9px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .category-pill-list {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 3px;
+  }
+
+  .catalog-heading {
+    display: block;
+  }
+
+  .catalog-search {
+    width: 100%;
+    margin-top: 18px;
+    justify-content: flex-start;
+  }
+
+  .catalog-search-input {
+    min-width: 0;
+  }
+
+  .sort-filter {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+}
+.category-pill {
+  min-height: 36px;
+  padding: 8px 15px;
+  border: 1px solid rgba(9, 9, 11, 0.1);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.category-pill:hover {
+  border-color: rgba(9, 9, 11, 0.3);
+  transform: translateY(-1px);
+}
+
+.category-pill.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.category-pill-sub {
+  min-height: 32px;
+  padding: 7px 13px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sort-filter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0;
+  min-height: 58px;
+  padding: 16px 0;
+}
+
+.sort-filter-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.sort-separator {
+  margin: 0 14px;
+  color: rgba(9, 9, 11, 0.18);
+  user-select: none;
+}
+
+.sort-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 0;
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.sort-option:hover {
+  color: var(--ink-2);
+}
+
+.category-pill.placeholder {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.7;
+}
+
+.category-pill.placeholder:hover {
+  border-color: transparent;
+  transform: none;
+}
+
+.sort-option.active {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+@media (max-width: 768px) {
+  .catalog-search {
+    width: 100%;
+  }
+
+  .catalog-search .btn {
+    flex-shrink: 0;
+  }
+
+  .category-filter-row {
+    display: block;
+  }
+
+  .category-filter-label {
+    display: block;
+    padding: 0 0 8px;
+  }
+
+  .category-pill-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+  }
+
+  .category-pill-list::-webkit-scrollbar,
+  .sort-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  .category-pill {
+    flex: 0 0 auto;
+  }
+
+  .sort-filter {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+}
