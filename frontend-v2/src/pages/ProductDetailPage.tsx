@@ -33,7 +33,7 @@ export function ProductDetailPage() {
   };
 
   const buyMutation = useMutation({
-    mutationFn: () => purchase(Number(productId), quantity),
+    mutationFn: (requestedQuantity: number) => purchase(Number(productId), requestedQuantity),
     onSuccess: (res) => {
       toast('주문이 생성되었어요. 결제를 진행해주세요.');
       navigate(`/orders/${res.orderId}`);
@@ -42,7 +42,7 @@ export function ProductDetailPage() {
   });
 
   const cartMutation = useMutation({
-    mutationFn: () => addCartItem(Number(productId), quantity),
+    mutationFn: (requestedQuantity: number) => addCartItem(Number(productId), requestedQuantity),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast('장바구니에 담았어요.');
@@ -78,6 +78,20 @@ export function ProductDetailPage() {
   if (!product) return <div className="empty">상품을 찾을 수 없어요.</div>;
 
   const soldOut = product.availableStocks <= 0;
+  const clampQuantity = (value: number) => {
+    const numericValue = Number.isFinite(value) ? value : 1;
+    return Math.min(Math.max(1, numericValue), Math.max(product.availableStocks, 1));
+  };
+  const requestPurchase = () => {
+    const requestedQuantity = clampQuantity(quantity);
+    setQuantity(requestedQuantity);
+    buyMutation.mutate(requestedQuantity);
+  };
+  const requestAddCartItem = () => {
+    const requestedQuantity = clampQuantity(quantity);
+    setQuantity(requestedQuantity);
+    cartMutation.mutate(requestedQuantity);
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }} className="detail-grid">
@@ -107,7 +121,7 @@ export function ProductDetailPage() {
             min={1}
             max={Math.max(product.availableStocks, 1)}
             value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+            onChange={(e) => setQuantity(clampQuantity(Number(e.target.value)))}
           />
         </div>
 
@@ -116,14 +130,14 @@ export function ProductDetailPage() {
             className="btn btn-buy"
             style={{ flex: 1 }}
             disabled={soldOut || buyMutation.isPending}
-            onClick={() => (tokenStore.isLoggedIn() ? buyMutation.mutate() : requireLogin())}
+            onClick={() => (tokenStore.isLoggedIn() ? requestPurchase() : requireLogin())}
           >
             바로 구매 <span className="chip">↗</span>
           </button>
           <button
             className="btn btn-ghost"
             disabled={soldOut || cartMutation.isPending}
-            onClick={() => (tokenStore.isLoggedIn() ? cartMutation.mutate() : requireLogin())}
+            onClick={() => (tokenStore.isLoggedIn() ? requestAddCartItem() : requireLogin())}
           >
             장바구니
           </button>

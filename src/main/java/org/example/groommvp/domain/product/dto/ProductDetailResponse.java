@@ -26,10 +26,13 @@ public class ProductDetailResponse {
     @Schema(description = "현재 재고 수량", example = "50")
     private final Integer stocks;
 
+    @Schema(description = "결제 대기 주문이 예약한 재고 수량", example = "3")
+    private final Integer reservedStocks;
+
     @Schema(description = "결제 대기 예약분을 제외한 구매 가능 재고 수량", example = "47")
     private final Integer availableStocks;
 
-    @Schema(description = "등록 카테고리", example = "2")
+    @Schema(description = "등록 카테고리", example = "2", nullable = true)
     private final Long category;
 
     private final List<ImageResponse> detailImages;
@@ -45,6 +48,7 @@ public class ProductDetailResponse {
                 .productPrice(product.getProductPrice())
                 .productImage(productImageUrl)
                 .stocks(stock.getStocks())
+                .reservedStocks(stock.getReservedStocks())
                 .availableStocks(stock.getAvailableStocks())
                 // 기존 데이터 중 카테고리가 연결되지 않은 상품도 상세 조회는 가능해야 한다.
                 .category(product.getCategory() != null ? product.getCategory().getCategoryId() : null)

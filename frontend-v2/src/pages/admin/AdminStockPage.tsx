@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getProducts } from '../../api/products';
+import { getAllProducts } from '../../api/products';
 import { stockIn, getStockHistories } from '../../api/stock';
 import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
@@ -24,7 +24,7 @@ export function AdminStockPage() {
 
   const { data: products } = useQuery({
     queryKey: ['admin-products-all'],
-    queryFn: () => getProducts({ page: 0, size: 100 })
+    queryFn: getAllProducts
   });
 
   const { data: histories, isLoading: historiesLoading, isError: isHistoriesError, error: historiesError } = useQuery({
@@ -39,6 +39,7 @@ export function AdminStockPage() {
       queryClient.invalidateQueries({ queryKey: ['stock-histories', productId] });
       queryClient.invalidateQueries({ queryKey: ['admin-products-all'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', productId] });
       setQuantity('');
       toast('입고 처리되었어요.');
     },
@@ -65,10 +66,10 @@ export function AdminStockPage() {
               <tr><th>상품</th><th>실제 재고</th><th>예약 재고</th><th>구매 가능</th><th /></tr>
             </thead>
             <tbody>
-              {(products?.content ?? []).length === 0 && (
+              {(products ?? []).length === 0 && (
                 <tr><td colSpan={5} className="text-muted" style={{ textAlign: 'center' }}>등록된 상품이 없어요.</td></tr>
               )}
-              {(products?.content ?? []).map((product) => (
+              {(products ?? []).map((product) => (
                 <tr key={product.productId}>
                   <td><b>#{product.productId} {product.productName}</b></td>
                   <td>{product.stocks}개</td>
@@ -101,7 +102,7 @@ export function AdminStockPage() {
           >
             <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)} style={{ flex: 2, minWidth: 180 }}>
               <option value="">상품 선택</option>
-              {(products?.content ?? []).map((p) => (
+              {(products ?? []).map((p) => (
                 <option key={p.productId} value={p.productId}>#{p.productId} {p.productName}</option>
               ))}
             </select>

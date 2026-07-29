@@ -58,6 +58,7 @@ export type ProductDetail = {
   productName: string;
   productPrice: number;
   stocks: number;
+  reservedStocks: number;
   availableStocks: number;
 };
 

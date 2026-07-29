@@ -22,7 +22,7 @@ export function MyPage() {
     enabled: loggedIn
   });
 
-  const { data: orders, isLoading: isOrdersLoading } = useQuery({
+  const { data: orders, isLoading: isOrdersLoading, isError: isOrdersError, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ['my-orders'],
     queryFn: getMyOrders,
     enabled: loggedIn
@@ -98,13 +98,20 @@ export function MyPage() {
         <div className="core">
           <div className="row between" style={{ marginBottom: 14 }}>
             <h2 className="h-section">내 주문 내역</h2>
-            <button className="btn btn-ghost btn-sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['my-orders'] })}>
+            <button className="btn btn-ghost btn-sm" onClick={() => refetchOrders()}>
               새로고침
             </button>
           </div>
 
           {isOrdersLoading ? (
             <div className="spin" />
+          ) : isOrdersError ? (
+            <div className="empty">
+              <p>주문 내역을 불러오지 못했어요. {ordersError instanceof ApiError ? ordersError.message : ''}</p>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => refetchOrders()}>
+                다시 시도
+              </button>
+            </div>
           ) : !orders?.length ? (
             <p className="text-muted">아직 주문 내역이 없어요.</p>
           ) : (
