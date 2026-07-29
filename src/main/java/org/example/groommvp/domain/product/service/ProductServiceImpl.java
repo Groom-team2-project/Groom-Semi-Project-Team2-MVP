@@ -167,6 +167,8 @@ public class ProductServiceImpl implements ProductService{
 
         String productImageUrl = s3imageStorage.toUrl(product.getProductImage());
 
+        productRepository.incrementViewCount(productId);
+
         return ProductDetailResponse.from(product, stock, productImageUrl, detailImages);
     }
 

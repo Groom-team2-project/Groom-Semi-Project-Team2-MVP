@@ -27,6 +27,12 @@ export function ProductCard({ product, index }: { product: ProductListItem; inde
         <div className="brand-line">SOLDOUT</div>
         <div className="name">{product.productName}</div>
         <div className="price">{formatPrice(product.productPrice)}</div>
+        <div className="row between" style={{ marginTop: 2 }}>
+          <span className="price-label">즉시 구매가</span>
+          <span className="text-muted" style={{ fontSize: 12 }}>
+            {product.stocks > 0 ? `재고 ${product.stocks}개` : '품절'} · 조회 {product.viewCount}
+          </span>
+        </div>
         <div className="price-label">{soldOut ? '품절' : '즉시 구매가'}</div>
       </div>
     </Link>

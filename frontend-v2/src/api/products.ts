@@ -1,11 +1,13 @@
 import { api } from './client';
-import type { ImageResponse, PageResponse, ProductDetail, ProductListItem } from './types';
+import type {ImageResponse, PageResponse, ProductDetail, ProductListItem, ProductSortType} from './types';
 
-export function getProducts(params: { page?: number; size?: number; keyword?: string } = {}) {
+export function getProducts(params: { page?: number; size?: number; keyword?: string; categoryId?: number; sort?: ProductSortType } = {}) {
   const q = new URLSearchParams();
   q.set('page', String(params.page ?? 0));
   q.set('size', String(params.size ?? 12));
   if (params.keyword) q.set('keyword', params.keyword);
+  if (params.categoryId != null) q.set('categoryId', String(params.categoryId));
+  if (params.sort) q.set('sort', params.sort);
   return api<PageResponse<ProductListItem>>(`/api/v1/products?${q}`);
 }
 
