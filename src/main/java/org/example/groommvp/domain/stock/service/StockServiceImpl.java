@@ -1,6 +1,7 @@
 package org.example.groommvp.domain.stock.service;
 
 import java.util.List;
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ProductRepository;
@@ -66,9 +67,29 @@ public class StockServiceImpl implements StockService {
         if (!productRepository.existsById(productId)) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_FOUND);
         }
-        return stockHistoryRepository.findHistoriesByProductId(productId).stream()
-                .map(StockHistoryResponse::from)
-                .toList();
+
+        // 저장된 이력에는 당시 재고 스냅샷이 없으므로, 최신 이력부터 현재 재고를 역산한다.
+        List<StockHistoryEntity> histories = stockHistoryRepository.findHistoriesByProductId(productId);
+        if (histories.isEmpty()) {
+            return List.of();
+        }
+
+        int stocksAfterChange = histories.get(0).getStock().getStocks();
+        List<StockHistoryResponse> responses = new ArrayList<>(histories.size());
+        for (StockHistoryEntity history : histories) {
+            responses.add(StockHistoryResponse.from(history, stocksAfterChange));
+            stocksAfterChange = calculateStocksBeforeChange(history, stocksAfterChange);
+        }
+        return responses;
+    }
+
+    private int calculateStocksBeforeChange(StockHistoryEntity history, int stocksAfterChange) {
+        return switch (history.getChangeType()) {
+            case INBOUND, RESTORE -> stocksAfterChange - history.getChangedQty();
+            case DECREASE, CONFIRM -> stocksAfterChange + history.getChangedQty();
+            // 예약/해제는 실제 재고(stocks)가 아니라 reservedStocks만 바꾼다.
+            case RESERVE, RELEASE -> stocksAfterChange;
+        };
     }
 
     /** 재고 레코드가 없는 상품에 대해 최초 재고(0개)를 생성한다. 상품이 없으면 예외. */

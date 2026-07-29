@@ -174,6 +174,9 @@ export function OrderDetailPage() {
               </p>
             )}
 
+            <Link to="/me" className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: 14 }}>
+              내 주문 내역 보기
+            </Link>
             <Link to="/" className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 14 }}>
               계속 쇼핑하기
             </Link>

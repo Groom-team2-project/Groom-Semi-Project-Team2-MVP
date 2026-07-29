@@ -49,12 +49,17 @@ export type ProductListItem = {
   productId: number;
   productName: string;
   productPrice: number;
+  stocks: number;
+  reservedStocks: number;
+  availableStocks: number;
 };
 
 export type ProductDetail = {
   productName: string;
   productPrice: number;
   stocks: number;
+  reservedStocks: number;
+  availableStocks: number;
 };
 
 export type CategoryResponse = {
