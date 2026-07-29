@@ -1,5 +1,6 @@
 package org.example.groommvp.domain.order.service;
 
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.order.dto.PurchaseRequest;
 import org.example.groommvp.domain.order.dto.PurchaseResponse;
@@ -49,7 +50,8 @@ public class PurchaseService {
 
         int orderPrice = product.getProductPrice();
         long totalPrice = (long) orderPrice * quantity;
-        Order order = orderRepository.save(Order.pendingPayment(memberId, totalPrice));
+        LocalDateTime paymentExpiresAt = LocalDateTime.now().plusMinutes(30);
+        Order order = orderRepository.save(Order.pendingPayment(memberId, totalPrice, paymentExpiresAt));
         orderItemRepository.save(new OrderItem(order, product, quantity, orderPrice));
         stockHistoryRepository.save(StockHistoryEntity.reserve(stock, order.getId(), quantity, PURCHASE_REASON));
 

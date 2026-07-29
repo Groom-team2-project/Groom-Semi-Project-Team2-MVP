@@ -2,7 +2,10 @@ package org.example.groommvp.domain.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.time.LocalDateTime;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.example.groommvp.domain.order.dto.OrderResponse;
 import org.example.groommvp.domain.order.entity.Order;
 import org.example.groommvp.domain.order.entity.OrderItem;
@@ -33,6 +36,9 @@ class OrderQueryServiceTest {
     @Autowired
     private ProductRepository productRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @AfterEach
     void tearDown() {
         orderItemRepository.deleteAllInBatch();
@@ -44,14 +50,25 @@ class OrderQueryServiceTest {
     @DisplayName("주문자 회원은 주문 상세를 조회할 수 있다")
     void getOrderByOwner() {
         Long memberId = 1L;
-        Order order = orderRepository.save(Order.pendingPayment(memberId, 10000L));
-        ProductEntity product = productRepository.save(new ProductEntity("Owner Product", 10000, null, null));
+        LocalDateTime paymentExpiresAt = LocalDateTime.now().plusMinutes(30);
+
+        Order order = orderRepository.save(
+                Order.pendingPayment(memberId, 10000L, paymentExpiresAt)
+        );
+        ProductEntity product = productRepository.save(
+                ProductEntity.builder()
+                        .productName("Owner Product")
+                        .productPrice(10_000)
+                        .productImage("owner-product.png")
+                        .build()
+        );
         orderItemRepository.save(new OrderItem(order, product, 1, 10000));
 
         OrderResponse response = orderQueryService.getOrder(order.getId(), memberId);
 
-        assertThat(response.orderId()).isEqualTo(order.getId());
+        assertThat(response.paymentExpiresAt()).isEqualTo(paymentExpiresAt);
         assertThat(response.orderItems()).hasSize(1);
+        assertThat(response.orderId()).isEqualTo(order.getId());
     }
 
     @Test
@@ -72,5 +89,23 @@ class OrderQueryServiceTest {
         assertThatThrownBy(() -> orderQueryService.getOrder(order.getId(), null))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ORDER_FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("결제 대기 주문은 전달받은 결제 마감 시각을 저장한다")
+    void pendingPaymentStoresPaymentExpiresAt() {
+        LocalDateTime paymentExpiresAt =
+                LocalDateTime.of(2026, 7, 29, 23, 0);
+
+        Order order = orderRepository.saveAndFlush(
+                Order.pendingPayment(1L, 10_000L, paymentExpiresAt)
+        );
+
+        entityManager.clear();
+
+        Order reloadedOrder = orderRepository.findById(order.getId())
+                .orElseThrow();
+
+        assertThat(reloadedOrder.getPaymentExpiresAt()).isEqualTo(paymentExpiresAt);
     }
 }
