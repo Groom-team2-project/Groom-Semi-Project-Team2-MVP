@@ -1,16 +1,19 @@
 package org.example.groommvp.domain.product.repository;
 
+import jakarta.persistence.LockModeType;
 import org.example.groommvp.domain.category.entity.CategoryEntity;
 import org.example.groommvp.domain.order.entity.OrderStatus;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
 
@@ -70,4 +73,11 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     @Query("update ProductEntity p set p.viewCount = p.viewCount + 1 where p.productId = :productId")
     void incrementViewCount(@Param("productId") Long productId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        select p
+        from ProductEntity p
+        where p.productId = :productId
+        """)
+    Optional<ProductEntity> findByIdForUpdate(@Param("productId") Long productId);
 }

@@ -273,6 +273,32 @@ img { max-width: 100%; display: block; }
 .badge.failed { background: #fef2f2; color: var(--danger); border-color: rgba(220, 38, 38, 0.14); }
 @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
 
+/* ============ 결제 마감 카운트다운 ============ */
+.countdown {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.countdown b { font-weight: 800; letter-spacing: -0.01em; }
+.countdown.urgent { color: var(--danger); }
+.countdown.urgent b { animation: blink 1s steps(2, start) infinite; }
+.countdown.expired { color: var(--muted); }
+@keyframes blink { to { opacity: 0.35; } }
+
+/* 결제 확인 중 안내 */
+.processing-note {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; margin-top: 16px;
+  background: #fff8ee; border: 1px solid rgba(180, 83, 9, 0.16);
+  border-radius: var(--radius-md);
+  font-size: 13px; color: var(--warn);
+}
+.processing-note .dot-spin {
+  width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid rgba(180, 83, 9, 0.25); border-top-color: var(--warn);
+  animation: spin 0.7s linear infinite;
+}
+
 /* ============ 토스트 ============ */
 .toast-wrap {
   position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);

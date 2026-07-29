@@ -51,6 +51,8 @@ export type ProductListItem = {
   productPrice: number;
   stocks: number;
   viewCount: number;
+  reservedStocks: number;
+  availableStocks: number;
 };
 // 정렬
 export type ProductSortType = 'LATEST' | 'POPULAR' | 'VIEW_COUNT' | 'PRICE_ASC' | 'PRICE_DESC';
@@ -59,6 +61,8 @@ export type ProductDetail = {
   productName: string;
   productPrice: number;
   stocks: number;
+  reservedStocks: number;
+  availableStocks: number;
 };
 
 export type CategoryResponse = {
@@ -101,7 +105,12 @@ export type CartCheckoutResponse = {
 };
 
 // ---------- order ----------
-export type OrderStatus = 'PENDING_PAYMENT' | 'COMPLETED' | 'CANCELED' | 'PAYMENT_FAILED';
+export type OrderStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAYMENT_PROCESSING'   // 토스 승인 결과를 기다리는 중 — 결제·취소 모두 불가
+  | 'COMPLETED'
+  | 'CANCELED'
+  | 'PAYMENT_FAILED';
 
 export type OrderItemResponse = {
   orderItemId: number;
@@ -117,6 +126,8 @@ export type OrderResponse = {
   status: OrderStatus;
   totalPrice: number;
   canceledAt: string | null;
+  /** 이 시각까지 결제하지 않으면 예약 재고가 해제되고 주문이 취소된다 */
+  paymentExpiresAt: string | null;
   createdAt: string;
   orderItems: OrderItemResponse[];
 };

@@ -29,4 +29,9 @@ public enum OrderStatus {
     public boolean isCompleted() {
         return this == COMPLETED;
     }
+
+    // 토스 승인 결과를 기다리는 중인지 확인 (만료 스케줄러의 처리 대상이 아니다)
+    public boolean isPaymentProcessing() {
+        return this == PAYMENT_PROCESSING;
+    }
 }

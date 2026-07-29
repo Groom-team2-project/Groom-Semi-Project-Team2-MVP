@@ -28,12 +28,6 @@ public class ProductCreateRequest {
     @Positive(message = "제품 가격은 0보다 커야 합니다.")
     private Integer productPrice;
 
-    @Schema(description = "상품 이미지", example = "https://example.com/product.jpg",
-            requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotBlank(message = "등록할 제품의 이미지을 입력하세요.")
-    @JsonProperty("image")
-    private String productImage;
-
     @Schema(description = "초기 재고 수량 (1 이상)", example = "100",
             minimum = "1", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "등록할 제품의 수량을 입력하세요.")

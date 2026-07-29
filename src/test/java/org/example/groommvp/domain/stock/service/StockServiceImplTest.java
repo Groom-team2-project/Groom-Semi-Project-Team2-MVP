@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.util.Optional;
+import java.util.List;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.domain.stock.dto.StockHistoryResponse;
@@ -147,6 +148,30 @@ class StockServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.STOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("재고 이력은 각 변동 직후의 실제 재고를 최신순으로 보여준다")
+    void getHistories_calculatesStockAtEachHistory() {
+        // given: 최초 10개 입고 뒤 55개를 추가 입고해 현재 재고는 65개다.
+        Long productId = 1L;
+        ProductEntity product = product(productId, "티셔츠", 10000);
+        StockEntity stock = StockEntity.builder().product(product).stocks(0).build();
+        stock.increase(10);
+        StockHistoryEntity firstInbound = StockHistoryEntity.inbound(stock, 10, "최초 입고");
+        stock.increase(55);
+        StockHistoryEntity latestInbound = StockHistoryEntity.inbound(stock, 55, "추가 입고");
+
+        given(productRepository.existsById(productId)).willReturn(true);
+        given(stockHistoryRepository.findHistoriesByProductId(productId))
+                .willReturn(List.of(latestInbound, firstInbound));
+
+        // when
+        List<StockHistoryResponse> responses = stockService.getHistories(productId);
+
+        // then
+        assertThat(responses).extracting(StockHistoryResponse::getCurrentStocks)
+                .containsExactly(65, 10);
     }
 
     /** develop 의 ProductEntity 는 (productName, productPrice) 빌더만 있어, id 는 리플렉션으로 채운다. */
