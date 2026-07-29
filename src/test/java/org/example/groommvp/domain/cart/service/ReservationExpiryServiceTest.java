@@ -208,6 +208,22 @@ class ReservationExpiryServiceTest {
     }
 
     @Test
+    @DisplayName("체크아웃한 주문에는 결제 마감 시각이 박힌다 (단건 구매와 동일)")
+    void checkout_setsPaymentExpiresAt() {
+        LocalDateTime before = LocalDateTime.now();
+
+        Long orderId = checkoutWithQuantity(1);
+
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        // 비워두면 응답을 받는 쪽이 "마감 없는 주문" 으로 오해한다. 회수 스케줄러와 같은
+        // 설정값(기본 30분)에서 나오므로 그 범위 안에 들어와야 한다.
+        assertThat(order.getPaymentExpiresAt())
+                .isNotNull()
+                .isAfter(before)
+                .isBefore(LocalDateTime.now().plusMinutes(31));
+    }
+
+    @Test
     @DisplayName("담은 뒤 삭제된 상품은 주문으로 전환되지 않는다")
     void checkout_throwsForDeletedProduct() {
         cartService.addItem(memberId, new CartItemAddRequest(productId, 1));
