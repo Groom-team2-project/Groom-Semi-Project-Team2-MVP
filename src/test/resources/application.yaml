@@ -43,3 +43,4 @@ toss:
   secret-key: test-dummy-secret-key
   confirm-url: http://localhost:8080/toss/confirm
   cancel-url: http://localhost:8080/toss/{paymentKey}/cancel
+  lookup-by-order-id-url: http://localhost:8080/toss/orders/{orderId}

@@ -12,6 +12,8 @@ export function photoOf(productId: number, size = 600) {
 }
 
 export function ProductCard({ product, index }: { product: ProductListItem; index: number }) {
+  const soldOut = product.availableStocks <= 0;
+
   return (
     <Link
       to={`/products/${product.productId}`}
@@ -19,13 +21,13 @@ export function ProductCard({ product, index }: { product: ProductListItem; inde
     >
       <div className="card-photo">
         <img src={photoOf(product.productId)} alt={product.productName} loading="lazy" />
-        <span className="tag">Drop #{product.productId}</span>
+        <span className="tag">{soldOut ? 'SOLD OUT' : `구매 가능 ${product.availableStocks}개`}</span>
       </div>
       <div className="card-body">
         <div className="brand-line">SOLDOUT</div>
         <div className="name">{product.productName}</div>
         <div className="price">{formatPrice(product.productPrice)}</div>
-        <div className="price-label">즉시 구매가</div>
+        <div className="price-label">{soldOut ? '품절' : '즉시 구매가'}</div>
       </div>
     </Link>
   );

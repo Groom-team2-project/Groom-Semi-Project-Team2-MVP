@@ -19,7 +19,7 @@ export function ProductDetailPage() {
   const [content, setContent] = useState('');
   const [rating, setRating] = useState(5);
 
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, isError, error } = useQuery({
     queryKey: ['product', productId],
     queryFn: () => getProduct(productId)
   });
@@ -33,7 +33,7 @@ export function ProductDetailPage() {
   };
 
   const buyMutation = useMutation({
-    mutationFn: () => purchase(Number(productId), quantity),
+    mutationFn: (requestedQuantity: number) => purchase(Number(productId), requestedQuantity),
     onSuccess: (res) => {
       toast('주문이 생성되었어요. 결제를 진행해주세요.');
       navigate(`/orders/${res.orderId}`);
@@ -42,7 +42,7 @@ export function ProductDetailPage() {
   });
 
   const cartMutation = useMutation({
-    mutationFn: () => addCartItem(Number(productId), quantity),
+    mutationFn: (requestedQuantity: number) => addCartItem(Number(productId), requestedQuantity),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       toast('장바구니에 담았어요.');
@@ -71,9 +71,27 @@ export function ProductDetailPage() {
   }
 
   if (isLoading) return <div className="spin" />;
+  if (isError) {
+    const message = error instanceof ApiError ? error.message : '상품 상세 요청에 실패했어요.';
+    return <div className="empty">상품을 불러오지 못했어요. {message}</div>;
+  }
   if (!product) return <div className="empty">상품을 찾을 수 없어요.</div>;
 
-  const soldOut = product.stocks <= 0;
+  const soldOut = product.availableStocks <= 0;
+  const clampQuantity = (value: number) => {
+    const numericValue = Number.isFinite(value) ? value : 1;
+    return Math.min(Math.max(1, numericValue), Math.max(product.availableStocks, 1));
+  };
+  const requestPurchase = () => {
+    const requestedQuantity = clampQuantity(quantity);
+    setQuantity(requestedQuantity);
+    buyMutation.mutate(requestedQuantity);
+  };
+  const requestAddCartItem = () => {
+    const requestedQuantity = clampQuantity(quantity);
+    setQuantity(requestedQuantity);
+    cartMutation.mutate(requestedQuantity);
+  };
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }} className="detail-grid">
@@ -90,7 +108,7 @@ export function ProductDetailPage() {
           {formatPrice(product.productPrice)}
         </div>
         <p className="text-muted" style={{ marginTop: 6 }}>
-          {soldOut ? '품절' : `남은 재고 ${product.stocks}개`}
+          {soldOut ? '품절' : `구매 가능 ${product.availableStocks}개`}
         </p>
 
         <div className="divider" />
@@ -101,9 +119,9 @@ export function ProductDetailPage() {
             className="input"
             type="number"
             min={1}
-            max={Math.max(product.stocks, 1)}
+            max={Math.max(product.availableStocks, 1)}
             value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+            onChange={(e) => setQuantity(clampQuantity(Number(e.target.value)))}
           />
         </div>
 
@@ -112,14 +130,14 @@ export function ProductDetailPage() {
             className="btn btn-buy"
             style={{ flex: 1 }}
             disabled={soldOut || buyMutation.isPending}
-            onClick={() => (tokenStore.isLoggedIn() ? buyMutation.mutate() : requireLogin())}
+            onClick={() => (tokenStore.isLoggedIn() ? requestPurchase() : requireLogin())}
           >
             바로 구매 <span className="chip">↗</span>
           </button>
           <button
             className="btn btn-ghost"
             disabled={soldOut || cartMutation.isPending}
-            onClick={() => (tokenStore.isLoggedIn() ? cartMutation.mutate() : requireLogin())}
+            onClick={() => (tokenStore.isLoggedIn() ? requestAddCartItem() : requireLogin())}
           >
             장바구니
           </button>
