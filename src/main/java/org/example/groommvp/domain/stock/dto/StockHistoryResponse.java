@@ -41,6 +41,14 @@ public class StockHistoryResponse {
     private final LocalDateTime createdAt;
 
     public static StockHistoryResponse from(StockHistoryEntity history) {
+        return from(history, history.getStock().getStocks());
+    }
+
+    /**
+     * 이력 발생 직후의 실제 재고 수량을 명시해 응답을 생성한다.
+     * 이력 목록 조회에서는 현재 재고를 최신 이력부터 역산한 값을 전달한다.
+     */
+    public static StockHistoryResponse from(StockHistoryEntity history, int currentStocks) {
         StockEntity stock = history.getStock();
         return StockHistoryResponse.builder()
                 .historyId(history.getHistoryId())
@@ -50,7 +58,7 @@ public class StockHistoryResponse {
                 .orderId(history.getOrderId())
                 .type(history.getChangeType())
                 .changedQty(history.getChangedQty())
-                .currentStocks(stock.getStocks())
+                .currentStocks(currentStocks)
                 .reason(history.getReason())
                 .createdAt(history.getCreatedAt())
                 .build();

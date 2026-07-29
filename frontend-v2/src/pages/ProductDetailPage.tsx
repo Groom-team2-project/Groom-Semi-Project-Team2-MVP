@@ -19,7 +19,7 @@ export function ProductDetailPage() {
   const [content, setContent] = useState('');
   const [rating, setRating] = useState(5);
 
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, isError, error } = useQuery({
     queryKey: ['product', productId],
     queryFn: () => getProduct(productId)
   });
@@ -71,9 +71,13 @@ export function ProductDetailPage() {
   }
 
   if (isLoading) return <div className="spin" />;
+  if (isError) {
+    const message = error instanceof ApiError ? error.message : '상품 상세 요청에 실패했어요.';
+    return <div className="empty">상품을 불러오지 못했어요. {message}</div>;
+  }
   if (!product) return <div className="empty">상품을 찾을 수 없어요.</div>;
 
-  const soldOut = product.stocks <= 0;
+  const soldOut = product.availableStocks <= 0;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }} className="detail-grid">
@@ -90,7 +94,7 @@ export function ProductDetailPage() {
           {formatPrice(product.productPrice)}
         </div>
         <p className="text-muted" style={{ marginTop: 6 }}>
-          {soldOut ? '품절' : `남은 재고 ${product.stocks}개`}
+          {soldOut ? '품절' : `구매 가능 ${product.availableStocks}개`}
         </p>
 
         <div className="divider" />
@@ -101,7 +105,7 @@ export function ProductDetailPage() {
             className="input"
             type="number"
             min={1}
-            max={Math.max(product.stocks, 1)}
+            max={Math.max(product.availableStocks, 1)}
             value={quantity}
             onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
           />

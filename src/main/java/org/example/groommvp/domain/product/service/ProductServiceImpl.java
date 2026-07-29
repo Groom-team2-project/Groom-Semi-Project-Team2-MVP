@@ -159,10 +159,10 @@ public class ProductServiceImpl implements ProductService{
                 .map(ProductEntity::getProductId)
                 .toList();
 
-        Map<Long, Integer> stocksByProductId = stockRepository.findAllByProduct_ProductIdIn(productIds).stream()
+        Map<Long, StockEntity> stocksByProductId = stockRepository.findAllByProduct_ProductIdIn(productIds).stream()
                 .collect(Collectors.toMap(
                         s -> s.getProduct().getProductId(),
-                        StockEntity::getStocks
+                        stock -> stock
                 ));
 
         return productPage.map(product ->

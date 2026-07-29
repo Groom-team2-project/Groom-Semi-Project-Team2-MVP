@@ -6,7 +6,7 @@ export function getStock(productId: number | string) {
 }
 
 export function stockIn(productId: number | string, quantity: number, reason: string) {
-  return api<StockResponse>(`/api/v1/products/${productId}/stock-in`, {
+  return api<StockHistoryResponse>(`/api/v1/products/${productId}/stock-in`, {
     method: 'POST',
     body: { quantity, reason },
     auth: true
@@ -14,5 +14,5 @@ export function stockIn(productId: number | string, quantity: number, reason: st
 }
 
 export function getStockHistories(productId: number | string) {
-  return api<StockHistoryResponse[]>(`/api/v1/products/${productId}/stock-histories`);
+  return api<StockHistoryResponse[]>(`/api/v1/products/${productId}/stock-histories`, { auth: true });
 }
