@@ -21,8 +21,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 	@Query("select o from Order o where o.id = :orderId")
 	Optional<Order> findByIdWithPessimisticLock(@Param("orderId") Long orderId);
 
-	/** 회원의 주문 목록. 최신순. (마이페이지 주문 내역) */
-	List<Order> findByMemberIdOrderByCreatedAtDesc(Long memberId);
+	/**
+	 * 회원의 주문 목록. 최신순. (마이페이지 주문 내역)
+	 *
+	 * <p>{@code createdAt} 은 같은 트랜잭션/같은 밀리초에 만들어진 주문끼리 동률이 될 수 있어
+	 * 그것만으로는 정렬이 비결정적이다. 조회할 때마다 순서가 뒤바뀌면 화면도 테스트도 흔들리므로
+	 * ID 를 보조 키로 두어 동률을 항상 같은 순서로 끊는다.
+	 */
+	List<Order> findByMemberIdOrderByCreatedAtDescIdDesc(Long memberId);
 
 	/**
 	 * 결제되지 않은 채 방치된 주문의 ID를 오래된 순으로 조회한다. (예약 재고 회수용)

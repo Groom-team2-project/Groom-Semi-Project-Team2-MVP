@@ -145,7 +145,8 @@ public class PointService {
 
         // 그 주문에서 실제 사용한 포인트만 복구한다. (유니크 제약상 USE 이력은 최대 1건)
         long usedAmount = pointHistoryRepository
-                .findByMember_MemberIdAndOrderIdAndType(memberId, orderId, PointHistoryType.USE)
+                .findFirstByMember_MemberIdAndOrderIdAndTypeOrderByPointHistoryIdAsc(
+                        memberId, orderId, PointHistoryType.USE)
                 .map(PointHistoryEntity::getAmount)
                 .orElse(0L);
         if (usedAmount <= 0) {
@@ -183,10 +184,11 @@ public class PointService {
 
         try {
             return pointBalanceRepository.findByMember_MemberId(memberId)
-                    .orElseGet(() -> pointBalanceRepository.save(PointBalanceEntity.init(member)));
+                    .orElseGet(() -> pointBalanceRepository.saveAndFlush(PointBalanceEntity.init(member)));
         } catch (DataIntegrityViolationException e) {
             // 위 직렬화가 어긋나 중복 생성이 시도된 경우의 마지막 안전망.
-            throw new BusinessException(ErrorCode.POINT_BUSY);
+            // 원인을 함께 넘겨야 깨진 제약이 point_balances.member_id 유니크인지 로그에서 가려낼 수 있다.
+            throw new BusinessException(ErrorCode.POINT_BUSY, e);
         }
     }
 
@@ -216,7 +218,7 @@ public class PointService {
             pointHistoryRepository.saveAndFlush(
                     PointHistoryEntity.of(member, type, amount, balanceAfter, orderId));
         } catch (DataIntegrityViolationException e) {
-            throw new BusinessException(ErrorCode.POINT_ALREADY_PROCESSED);
+            throw new BusinessException(ErrorCode.POINT_ALREADY_PROCESSED, e);
         }
     }
 }

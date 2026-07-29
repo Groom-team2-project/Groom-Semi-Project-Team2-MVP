@@ -182,7 +182,7 @@ class CartServiceTest {
             given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
                     .willReturn(Optional.of(member(OWNER_ID)));
             given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.empty());
-            given(cartRepository.save(org.mockito.ArgumentMatchers.any(CartEntity.class)))
+            given(cartRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(CartEntity.class)))
                     .willAnswer(invocation -> invocation.getArgument(0));
             given(productRepository.findById(1L)).willReturn(Optional.of(product(1L, "티셔츠", 10_000)));
 
@@ -190,7 +190,7 @@ class CartServiceTest {
 
             assertThat(response.totalQuantity()).isEqualTo(2);
             verify(memberRepository).findByIdWithPessimisticLock(OWNER_ID);
-            verify(cartRepository).save(org.mockito.ArgumentMatchers.any(CartEntity.class));
+            verify(cartRepository).saveAndFlush(org.mockito.ArgumentMatchers.any(CartEntity.class));
             // 없는 장바구니 행을 FOR UPDATE 하면 갭 락이 잡혀 서로 다른 회원끼리도 교착한다.
             verify(cartRepository, never())
                     .findByMemberIdWithPessimisticLock(org.mockito.ArgumentMatchers.any());
@@ -202,7 +202,7 @@ class CartServiceTest {
             given(memberRepository.findByIdWithPessimisticLock(OWNER_ID))
                     .willReturn(Optional.of(member(OWNER_ID)));
             given(cartRepository.findByMemberIdWithItems(OWNER_ID)).willReturn(Optional.empty());
-            given(cartRepository.save(org.mockito.ArgumentMatchers.any(CartEntity.class)))
+            given(cartRepository.saveAndFlush(org.mockito.ArgumentMatchers.any(CartEntity.class)))
                     .willThrow(new DataIntegrityViolationException("duplicate member_id"));
 
             assertThatThrownBy(() -> cartService.addItem(OWNER_ID, new CartItemAddRequest(1L, 1)))
