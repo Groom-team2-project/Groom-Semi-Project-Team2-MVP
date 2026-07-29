@@ -8,6 +8,7 @@ import org.example.groommvp.domain.product.repository.ImageRepository;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.example.groommvp.global.storage.S3TransactionCleanup;
 import org.example.groommvp.global.storage.S3imageStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,12 +22,13 @@ public class ImageService {
     private final ImageRepository imageRepository;
     private final ProductRepository productRepository;
     private final S3imageStorage s3imageStorage;
+    private final S3TransactionCleanup s3TransactionCleanup;
 
     //이미지 등록
     @Transactional
     public ImageResponse saveImage(Long productId, MultipartFile imageFile) {
         //상품 확인
-        ProductEntity product = productRepository.findById(productId)
+        ProductEntity product = productRepository.findByIdForUpdate(productId)
                 .filter(found -> found.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND));
         //현재 상세 이미지 개수 확인
@@ -35,19 +37,16 @@ public class ImageService {
         }
         //s3업로드
         String objectKey = s3imageStorage.upload(imageFile, "products/" + productId + "/details");
-        try {//업로드된 s3객체키를 DB에 저장
-            ImageEntity image = ImageEntity.builder()
-                    .product(product)
-                    .detailImage(objectKey)
-                    .build();
-            ImageEntity savedImage = imageRepository.save(image);
-            //객체 키를 조회 url로 바꿔서 응답
-            return ImageResponse.from(savedImage, s3imageStorage.toUrl(objectKey));
-        } catch (RuntimeException exception) {
-            //DB 저장에 실패하면 s3에 남은 파일 제거
-            s3imageStorage.delete(objectKey);
-            throw exception;
-        }
+        //메서드 실행 또는 실제 DB 커밋이 실패하면 새 S3 객체 제거
+        s3TransactionCleanup.deleteAfterRollback(objectKey);
+
+        ImageEntity image = ImageEntity.builder()
+                .product(product)
+                .detailImage(objectKey)
+                .build();
+        ImageEntity savedImage = imageRepository.save(image);
+
+        return ImageResponse.from(savedImage, s3imageStorage.toUrl(objectKey));
     }
 
     //이미지 수정
@@ -57,20 +56,17 @@ public class ImageService {
         ImageEntity image = imageRepository.findByImageIdAndProductProductId(imageId, productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMAGE_NOT_FOUND));
         //기존s3객치케보관
-        String oldObjectkey = image.getDetailImage();
+        String oldObjectKey = image.getDetailImage();
         //새 파일 먼저 업로드
         String newObjectKey = s3imageStorage.upload(imageFile, "products/" + productId + "/details");
 
-        try {//DB에는 새 객체키 저장
-            image.update(newObjectKey);
-            imageRepository.saveAndFlush(image);
-        } catch (RuntimeException exception) {
-            // DB 변경 실패 시 새로 올린 파일 제거
-            s3imageStorage.delete(newObjectKey);
-            throw exception;
-        }
-        //DB변경 성공 후 기존 파일 제거
-        s3imageStorage.delete(oldObjectkey);
+        // DB가 롤백되면 새 이미지 제거
+        s3TransactionCleanup.deleteAfterRollback(newObjectKey);
+        //DB에는 새 객체키 저장
+        image.update(newObjectKey);
+        imageRepository.saveAndFlush(image);
+        // DB 커밋 성공 후에만 기존 이미지 제거
+        s3TransactionCleanup.deleteAfterCommit(oldObjectKey);
 
         //새 조회 url응답
         return ImageResponse.from(image, s3imageStorage.toUrl(newObjectKey));
@@ -85,9 +81,9 @@ public class ImageService {
         String objectKey = image.getDetailImage();
         ImageResponse response = ImageResponse.from(image, s3imageStorage.toUrl(objectKey));
         imageRepository.delete(image);
-        imageRepository.flush();
 
-        s3imageStorage.delete(objectKey);
+        // DB 삭제가 실제 커밋된 뒤 S3 삭제
+        s3TransactionCleanup.deleteAfterCommit(objectKey);
 
         return response;
     }

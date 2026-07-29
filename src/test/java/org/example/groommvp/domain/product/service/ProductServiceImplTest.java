@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -27,12 +26,12 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.example.groommvp.global.storage.S3TransactionCleanup;
 import org.example.groommvp.global.storage.S3imageStorage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -50,6 +49,7 @@ class ProductServiceImplTest {
     @Mock CategoryRepository categoryRepository;
     @Mock ImageRepository imageRepository;
     @Mock S3imageStorage s3imageStorage;
+    @Mock S3TransactionCleanup s3TransactionCleanup;
     @InjectMocks ProductServiceImpl productService;
 
     @Test
@@ -78,7 +78,7 @@ class ProductServiceImplTest {
         ArgumentCaptor<StockEntity> stockCaptor = ArgumentCaptor.forClass(StockEntity.class);
         verify(stockRepository).save(stockCaptor.capture());
         assertThat(stockCaptor.getValue().getProduct().getProductId()).isEqualTo(1L);
-        verify(s3imageStorage, never()).delete(any());
+        verify(s3TransactionCleanup).deleteAfterRollback("products/main/new.png");
     }
 
     @Test
@@ -104,7 +104,7 @@ class ProductServiceImplTest {
         assertThatThrownBy(() -> productService.createProduct(request, image()))
                 .isInstanceOf(IllegalStateException.class);
 
-        verify(s3imageStorage).delete("products/main/new.png");
+        verify(s3TransactionCleanup).deleteAfterRollback("products/main/new.png");
         verify(stockRepository, never()).save(any());
     }
 
@@ -129,9 +129,9 @@ class ProductServiceImplTest {
         assertThat(product.getProductImage()).isEqualTo("new.png");
         assertThat(product.getCategory()).isSameAs(newCategory);
         assertThat(response.getProductImage()).isEqualTo("https://cdn/new.png");
-        InOrder order = inOrder(productRepository, s3imageStorage);
-        order.verify(productRepository).saveAndFlush(product);
-        order.verify(s3imageStorage).delete("old.png");
+        verify(productRepository).saveAndFlush(product);
+        verify(s3TransactionCleanup).deleteAfterRollback("new.png");
+        verify(s3TransactionCleanup).deleteAfterCommit("old.png");
     }
 
     @Test
@@ -151,7 +151,8 @@ class ProductServiceImplTest {
         assertThat(product.getProductImage()).isEqualTo("old.png");
         assertThat(response.getProductImage()).isEqualTo("https://cdn/old.png");
         verify(s3imageStorage, never()).upload(any(), any());
-        verify(s3imageStorage, never()).delete(any());
+        verify(s3TransactionCleanup, never()).deleteAfterCommit(any());
+        verify(s3TransactionCleanup, never()).deleteAfterRollback(any());
     }
 
     @Test
@@ -169,8 +170,8 @@ class ProductServiceImplTest {
                 1L, new ProductUpdateRequest("새 상품", 2000, 3L), image()))
                 .isInstanceOf(IllegalStateException.class);
 
-        verify(s3imageStorage).delete("new.png");
-        verify(s3imageStorage, never()).delete("old.png");
+        verify(s3TransactionCleanup).deleteAfterRollback("new.png");
+        verify(s3TransactionCleanup, never()).deleteAfterCommit("old.png");
     }
 
     @Test

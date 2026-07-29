@@ -7,6 +7,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -17,6 +18,7 @@ import java.nio.file.Path;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @EnabledIfEnvironmentVariable(named = "RUN_S3_INTEGRATION_TEST", matches = "true")
 class S3ImageStorageIntegrationTest {
@@ -52,6 +54,7 @@ class S3ImageStorageIntegrationTest {
             );
 
             String objectKey = null;
+            String verifiedPublicUrl = null;
             try {
                 objectKey = storage.upload(image, "codex-verification");
                 String verifiedObjectKey = objectKey;
@@ -61,6 +64,7 @@ class S3ImageStorageIntegrationTest {
                         .key(verifiedObjectKey)).contentLength()).isEqualTo((long) PNG.length);
 
                 String publicUrl = storage.toUrl(verifiedObjectKey);
+                verifiedPublicUrl = publicUrl;
                 HttpResponse<byte[]> response = HttpClient.newHttpClient().send(
                         HttpRequest.newBuilder(URI.create(publicUrl)).GET().build(),
                         HttpResponse.BodyHandlers.ofByteArray()
@@ -72,14 +76,25 @@ class S3ImageStorageIntegrationTest {
                 assertThat(response.body()).isEqualTo(PNG);
 
                 Path proofImage = Path.of("build", "s3-verification.png");
-                Path proofText = Path.of("build", "s3-verification.txt");
                 Files.createDirectories(proofImage.getParent());
                 Files.write(proofImage, response.body());
-                Files.writeString(proofText,
-                        "Upload, S3 HEAD, public HTTP GET, and cleanup succeeded.\n"
-                                + "Verified URL before cleanup: " + publicUrl + "\n");
             } finally {
-                storage.delete(objectKey);
+                if (objectKey != null) {
+                    String deletedObjectKey = objectKey;
+                    storage.delete(deletedObjectKey);
+
+                    assertThatThrownBy(() -> s3Client.headObject(request -> request
+                            .bucket(bucket)
+                            .key(deletedObjectKey)))
+                            .isInstanceOfSatisfying(S3Exception.class,
+                                    exception -> assertThat(exception.statusCode()).isEqualTo(404));
+
+                    if (verifiedPublicUrl != null) {
+                        Files.writeString(Path.of("build", "s3-verification.txt"),
+                                "Upload, S3 HEAD, public HTTP GET, and verified cleanup succeeded.\n"
+                                        + "Verified URL before cleanup: " + verifiedPublicUrl + "\n");
+                    }
+                }
             }
         }
     }

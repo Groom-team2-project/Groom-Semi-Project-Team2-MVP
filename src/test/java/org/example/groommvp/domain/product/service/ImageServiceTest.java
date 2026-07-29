@@ -7,6 +7,7 @@ import org.example.groommvp.domain.product.repository.ImageRepository;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.example.groommvp.global.storage.S3TransactionCleanup;
 import org.example.groommvp.global.storage.S3imageStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,9 @@ class ImageServiceTest {
     private S3imageStorage s3imageStorage;
 
     @Mock
+    private S3TransactionCleanup s3TransactionCleanup;
+
+    @Mock
     private MultipartFile imageFile;
 
     @InjectMocks
@@ -53,7 +57,7 @@ class ImageServiceTest {
     void saveImage() { //이미지 등록 성공
         ProductEntity product = product();
         when(product.getProductId()).thenReturn(PRODUCT_ID);
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
+        when(productRepository.findByIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(product));
         when(imageRepository.countByProductProductId(PRODUCT_ID)).thenReturn(0L);
         when(s3imageStorage.upload(imageFile, "products/1/details")).thenReturn(NEW_OBJECT_KEY);
         when(imageRepository.save(any(ImageEntity.class)))
@@ -65,12 +69,12 @@ class ImageServiceTest {
         assertThat(response.getProductId()).isEqualTo(PRODUCT_ID);
         assertThat(response.getDetailImage()).isEqualTo(NEW_IMAGE_URL);
         verify(imageRepository).save(any(ImageEntity.class));
-        verify(s3imageStorage, never()).delete(NEW_OBJECT_KEY);
+        verify(s3TransactionCleanup).deleteAfterRollback(NEW_OBJECT_KEY);
     }
 
     @Test
     void saveImageRejectsMoreThanTenImages() { //10장 제한
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(productRepository.findByIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(product()));
         when(imageRepository.countByProductProductId(PRODUCT_ID)).thenReturn(10L);
 
         assertThatThrownBy(() -> imageService.saveImage(PRODUCT_ID, imageFile))
@@ -83,7 +87,7 @@ class ImageServiceTest {
 
     @Test
     void saveImageDeletesUploadedObjectWhenDatabaseSaveFails() { //DB 저장 실패 시 업로드 파일 삭제
-        when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product()));
+        when(productRepository.findByIdForUpdate(PRODUCT_ID)).thenReturn(Optional.of(product()));
         when(imageRepository.countByProductProductId(PRODUCT_ID)).thenReturn(0L);
         when(s3imageStorage.upload(imageFile, "products/1/details")).thenReturn(NEW_OBJECT_KEY);
         when(imageRepository.save(any(ImageEntity.class)))
@@ -93,7 +97,7 @@ class ImageServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("database save failed");
 
-        verify(s3imageStorage).delete(NEW_OBJECT_KEY);
+        verify(s3TransactionCleanup).deleteAfterRollback(NEW_OBJECT_KEY);
     }
 
     @Test
@@ -110,7 +114,8 @@ class ImageServiceTest {
         assertThat(response.getDetailImage()).isEqualTo(NEW_IMAGE_URL);
         verify(image).update(NEW_OBJECT_KEY);
         verify(imageRepository).saveAndFlush(image);
-        verify(s3imageStorage).delete(OLD_OBJECT_KEY);
+        verify(s3TransactionCleanup).deleteAfterRollback(NEW_OBJECT_KEY);
+        verify(s3TransactionCleanup).deleteAfterCommit(OLD_OBJECT_KEY);
     }
 
     @Test
@@ -126,8 +131,8 @@ class ImageServiceTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("database update failed");
 
-        verify(s3imageStorage).delete(NEW_OBJECT_KEY);
-        verify(s3imageStorage, never()).delete(OLD_OBJECT_KEY);
+        verify(s3TransactionCleanup).deleteAfterRollback(NEW_OBJECT_KEY);
+        verify(s3TransactionCleanup, never()).deleteAfterCommit(OLD_OBJECT_KEY);
     }
 
     @Test
@@ -142,8 +147,8 @@ class ImageServiceTest {
 
         assertThat(response.getImageId()).isEqualTo(IMAGE_ID);
         verify(imageRepository).delete(image);
-        verify(imageRepository).flush();
-        verify(s3imageStorage).delete(OLD_OBJECT_KEY);
+        verify(imageRepository, never()).flush();
+        verify(s3TransactionCleanup).deleteAfterCommit(OLD_OBJECT_KEY);
     }
 
     private ProductEntity product() {

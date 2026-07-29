@@ -12,6 +12,7 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.example.groommvp.global.storage.S3TransactionCleanup;
 import org.example.groommvp.global.storage.S3imageStorage;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -35,6 +36,7 @@ public class ProductServiceImpl implements ProductService{
     private final CategoryRepository categoryRepository;
     private final ImageRepository imageRepository;
     private final S3imageStorage s3imageStorage;
+    private final S3TransactionCleanup s3TransactionCleanup;
 
     //상품 등록
     @Override
@@ -48,31 +50,27 @@ public class ProductServiceImpl implements ProductService{
         }
 
         String productImageKey = s3imageStorage.upload(productImage, "products/main");
+        s3TransactionCleanup.deleteAfterRollback(productImageKey);
 
-        try {
-            ProductEntity product = ProductEntity.builder()
-                    .productName(request.getProductName())
-                    .productPrice(request.getProductPrice())
-                    .productImage(productImageKey)
-                    .category(category)
-                    .build();
-            ProductEntity savedProduct =  productRepository.save(product);
+        ProductEntity product = ProductEntity.builder()
+                .productName(request.getProductName())
+                .productPrice(request.getProductPrice())
+                .productImage(productImageKey)
+                .category(category)
+                .build();
+        ProductEntity savedProduct = productRepository.save(product);
 
-            StockEntity stock = StockEntity.builder()
-                    .product(savedProduct)
-                    .stocks(request.getStocks())
-                    .build();
-            stockRepository.save(stock);
+        StockEntity stock = StockEntity.builder()
+                .product(savedProduct)
+                .stocks(request.getStocks())
+                .build();
+        stockRepository.save(stock);
 
-            return ProductResponse.from(
-                    savedProduct,
-                    stock,
-                    s3imageStorage.toUrl(productImageKey)
-            );
-        }catch (RuntimeException exception) {
-            s3imageStorage.delete(productImageKey);
-            throw exception;
-        }
+        return ProductResponse.from(
+                savedProduct,
+                stock,
+                s3imageStorage.toUrl(productImageKey)
+        );
     }
 
     //상품 수정
@@ -104,28 +102,20 @@ public class ProductServiceImpl implements ProductService{
                     productImage,
                     "products/main"
             );
+            s3TransactionCleanup.deleteAfterRollback(newImageKey);
             imageChanged = true;
         }
 
-        try {
-            product.update(
-                    request.getProductName(),
-                    request.getProductPrice(),
-                    newImageKey,
-                    category
-            );
+        product.update(
+                request.getProductName(),
+                request.getProductPrice(),
+                newImageKey,
+                category
+        );
 
-            productRepository.saveAndFlush(product);
-        } catch (RuntimeException exception) {
-            if (imageChanged) {
-                s3imageStorage.delete(newImageKey);
-            }
-
-            throw exception;
-        }
-
+        productRepository.saveAndFlush(product);
         if (imageChanged) {
-            s3imageStorage.delete(oldImageKey);
+            s3TransactionCleanup.deleteAfterCommit(oldImageKey);
         }
 
         return ProductResponse.from(

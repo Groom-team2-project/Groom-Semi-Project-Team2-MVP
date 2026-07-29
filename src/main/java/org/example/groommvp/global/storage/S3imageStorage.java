@@ -1,6 +1,7 @@
 package org.example.groommvp.global.storage;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
@@ -16,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class S3imageStorage {
 
@@ -64,7 +66,23 @@ public class S3imageStorage {
                 .bucket(bucket)
                 .key(objectkey)
                 .build();
-        s3Client.deleteObject(request);
+        try {
+            s3Client.deleteObject(request);
+        } catch (RuntimeException exception) {
+            throw new BusinessException(ErrorCode.IMAGE_DELETE_FAILED, exception);
+        }
+    }
+
+    /**
+     * DB 작업 실패 후 보상 정리에 사용한다.
+     * 정리 실패가 원래 예외를 가리지 않도록 경고만 기록한다.
+     */
+    public void deleteQuietly(String objectKey) {
+        try {
+            delete(objectKey);
+        } catch (BusinessException exception) {
+            log.warn("S3 객체 보상 삭제 실패: {}", objectKey, exception);
+        }
     }
 
     public String toUrl(String objectKey) {
