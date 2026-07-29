@@ -1,9 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 
 import './styles/global.css';
+import { queryClient } from './lib/queryClient';
 import { ToastProvider } from './components/Toast';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
@@ -17,12 +18,6 @@ import { KakaoCallbackPage } from './pages/KakaoCallbackPage';
 import { AdminProductsPage } from './pages/admin/AdminProductsPage';
 import { AdminCategoriesPage } from './pages/admin/AdminCategoriesPage';
 import { AdminStockPage } from './pages/admin/AdminStockPage';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false }
-  }
-});
 
 const router = createBrowserRouter([
   {
