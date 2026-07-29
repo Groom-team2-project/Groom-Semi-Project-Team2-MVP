@@ -39,6 +39,9 @@ public class Order extends BaseEntity {
     @Column(name = "total_price", nullable = false)
     private Long totalPrice;
 
+    @Column(name = "payment_expires_at")
+    private LocalDateTime paymentExpiresAt;
+
     @Column(name = "canceled_at")
     private LocalDateTime canceledAt;
 
@@ -61,6 +64,20 @@ public class Order extends BaseEntity {
         this.memberId = memberId;
         this.totalPrice = totalPrice;
         this.status = status;
+    }
+
+    public static Order pendingPayment(
+            Long memberId,
+            Long totalPrice,
+            LocalDateTime paymentExpiresAt
+    ) {
+        Order order = new Order(
+                memberId,
+                totalPrice,
+                OrderStatus.PENDING_PAYMENT
+        );
+        order.paymentExpiresAt = paymentExpiresAt;
+        return order;
     }
 
     public static Order pendingPayment(Long totalPrice) {
