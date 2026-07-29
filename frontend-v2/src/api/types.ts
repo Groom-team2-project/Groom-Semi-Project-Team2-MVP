@@ -49,12 +49,17 @@ export type ProductListItem = {
   productId: number;
   productName: string;
   productPrice: number;
+  stocks?: number;
+  viewCount?: number;
 };
 
 export type ProductDetail = {
   productName: string;
   productPrice: number;
+  productImage: string;
   stocks: number;
+  category: number;
+  detailImages: ImageResponse[];
 };
 
 export type CategoryResponse = {
@@ -181,5 +186,5 @@ export type StockHistoryResponse = {
 export type ImageResponse = {
   productId: number;
   imageId: number;
-  imageUrl: string;
+  detailImage: string;
 };
