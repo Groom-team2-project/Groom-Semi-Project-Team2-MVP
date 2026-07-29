@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.LocalDateTime;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.example.groommvp.domain.order.dto.OrderResponse;
 import org.example.groommvp.domain.order.entity.Order;
 import org.example.groommvp.domain.order.entity.OrderItem;
@@ -33,6 +35,9 @@ class OrderQueryServiceTest {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @AfterEach
     void tearDown() {
@@ -92,10 +97,15 @@ class OrderQueryServiceTest {
         LocalDateTime paymentExpiresAt =
                 LocalDateTime.of(2026, 7, 29, 23, 0);
 
-        Order order = orderRepository.save(
+        Order order = orderRepository.saveAndFlush(
                 Order.pendingPayment(1L, 10_000L, paymentExpiresAt)
         );
 
-        assertThat(order.getPaymentExpiresAt()).isEqualTo(paymentExpiresAt);
+        entityManager.clear();
+
+        Order reloadedOrder = orderRepository.findById(order.getId())
+                .orElseThrow();
+
+        assertThat(reloadedOrder.getPaymentExpiresAt()).isEqualTo(paymentExpiresAt);
     }
 }
