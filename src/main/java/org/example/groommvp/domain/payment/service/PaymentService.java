@@ -7,9 +7,9 @@ import org.example.groommvp.domain.order.entity.Order;
 import org.example.groommvp.domain.order.entity.OrderItem;
 import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
+import org.example.groommvp.domain.payment.dto.PaymentAttemptStarted;
 import org.example.groommvp.domain.payment.dto.RefundRequest;
 import org.example.groommvp.domain.payment.dto.RefundResponse;
-import org.example.groommvp.domain.payment.event.PaymentCompletedEvent;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
@@ -21,8 +21,6 @@ import org.example.groommvp.domain.payment.entity.Payment;
 import org.example.groommvp.domain.payment.repository.PaymentRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClientException;
@@ -33,7 +31,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class PaymentService {
 
 	private final PaymentRepository paymentRepository;
@@ -42,53 +39,39 @@ public class PaymentService {
 	private final TossPaymentClient tossPaymentClient;
 	private final StockRepository stockRepository;
 	private final StockHistoryRepository stockHistoryRepository;
-	private final ApplicationEventPublisher eventPublisher;
+	private final PaymentAttemptService paymentAttemptService;
 
-	@Transactional
+	/**
+	 * 결제를 승인한다.
+	 *
+	 * <p><b>트랜잭션을 걸지 않는다.</b> 토스 승인은 외부 HTTP 호출이라 수 초가 걸리는데,
+	 * 그 시간 내내 DB 트랜잭션과 락을 붙잡으면 커넥션 풀이 마른다. 대신 승인 전후의 DB 작업을
+	 * {@link PaymentAttemptService} 의 독립 트랜잭션으로 나누어 호출한다.
+	 *
+	 * <pre>
+	 * 1) begin()    주문을 PAYMENT_PROCESSING 으로 바꿔 커밋  → 만료 스케줄러가 건드리지 못함
+	 * 2) confirm()  토스 승인 (트랜잭션·락 없이)
+	 * 3) complete() 재고 확정 + 주문 완료 + 결제 저장
+	 *    revert()   실패 시 결제 대기로 복귀 (예약 유지 → 재시도 가능)
+	 * </pre>
+	 */
 	public PaymentResponse pay(Long orderId, PaymentRequest request) {
-		// 주문 조회
-		Order order = orderRepository.findById(orderId)
-			.orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+		// 1단계 — 승인 요청 전에 상태를 커밋한다. 실패하면 시도 자체가 시작되지 않는다.
+		//         승인에 쓸 금액도 여기서 받는다 (서버가 보관한 주문 금액 = 위변조 방지).
+		PaymentAttemptStarted started = paymentAttemptService.begin(orderId, request);
 
-		// 이중 결제 방지
-		if (paymentRepository.existsByOrder(order)) {
-			throw new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS);
-		}
-
-		// 클라이언트가 보낸 주문번호가 이 주문의 것인지 확인 (다른 주문의 결제를 가로채지 못하게)
-		if (!request.tossOrderId().startsWith(orderPrefix(orderId))) {
-			throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-		}
-
-		// 토스 결제 승인
+		// 2단계 — 트랜잭션 밖에서 토스를 호출한다.
 		try {
-			tossPaymentClient.confirm(request.paymentKey(), request.tossOrderId(), order.getTotalPrice());
+			tossPaymentClient.confirm(request.paymentKey(), request.tossOrderId(), started.amount());
 		} catch (RestClientException e) {
-			// 토스가 돌려준 실패 원인(상태코드 + 응답 본문)을 로그로 남긴다
-			log.error("토스 결제 승인 실패: {}", e.getMessage(), e);
+			// 승인 거절·사용자 취소 등. 주문은 살려두고 이 시도만 실패로 남긴다.
+			log.error("토스 결제 승인 실패: orderId={}, {}", orderId, e.getMessage(), e);
+			paymentAttemptService.revert(orderId, started.attemptId(), e.getMessage());
 			throw new BusinessException(ErrorCode.PAYMENT_FAILED);
 		}
 
-		List<OrderItem> orderItems = orderItemRepository.findByOrderIdWithProduct(orderId);
-		confirmReservedStocks(order, orderItems);
-		order.completePayment();
-
-		// 결제 생성 (PENDING)
-		Payment payment = new Payment(order, order.getTotalPrice(), request.method(), request.paymentKey());
-
-		// (모의) 결제 승인 (PENDING -> PAID)
-		payment.pay();
-
-		// 저장 — 레이스 대비: UNIQUE 충돌을 409로 매핑
-		try {
-			paymentRepository.saveAndFlush(payment);
-		} catch (DataIntegrityViolationException e) {
-			throw new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS);
-		}
-
-		eventPublisher.publishEvent(
-			new PaymentCompletedEvent(orderId, payment.getId(), payment.getAmount())
-		);
+		// 3단계 — 승인 성공을 반영한다.
+		Payment payment = paymentAttemptService.complete(orderId, started.attemptId());
 		return PaymentResponse.from(payment);
 	}
 
@@ -119,33 +102,6 @@ public class PaymentService {
 		order.cancel();
 
 		return RefundResponse.from(payment);
-	}
-
-	/**
-	 * 주문번호 접두사. 클라이언트는 {@code ORDER_{주문PK}_{시도구분}} 형태로 주문번호를 만든다.
-	 * (토스 orderId 는 재사용할 수 없어 재시도마다 새 값이 필요하다)
-	 */
-	private String orderPrefix(Long orderId) {
-		return "ORDER_" + orderId + "_";
-	}
-
-	private void confirmReservedStocks(Order order, List<OrderItem> orderItems) {
-		List<OrderItem> sortedOrderItems = orderItems.stream()
-				.sorted(Comparator.comparing(orderItem -> orderItem.getProduct().getProductId()))
-				.toList();
-
-		for (OrderItem orderItem : sortedOrderItems) {
-			Long productId = orderItem.getProduct().getProductId();
-			int quantity = orderItem.getQuantity();
-
-			StockEntity stock = stockRepository.findByProductIdWithPessimisticLock(productId)
-					.orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
-
-			stock.confirm(quantity);
-			stockHistoryRepository.save(
-					StockHistoryEntity.confirm(stock, order.getId(), quantity, "PAYMENT_CONFIRM")
-			);
-		}
 	}
 
 	private void restoreStocks(Order order, List<OrderItem> orderItems) {

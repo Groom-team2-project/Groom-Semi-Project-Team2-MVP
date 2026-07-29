@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getOrder, cancelOrder } from '../api/orders';
@@ -7,6 +7,7 @@ import { ApiError } from '../api/client';
 import { requestTossPayment, type TossMethod } from '../lib/toss';
 import { formatPrice, photoOf } from '../components/ProductCard';
 import { StatusBadge } from '../components/StatusBadge';
+import { PaymentCountdown } from '../components/PaymentCountdown';
 import { useToast } from '../components/Toast';
 
 const METHODS: { key: TossMethod; label: string }[] = [
@@ -24,10 +25,16 @@ export function OrderDetailPage() {
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', orderId],
-    queryFn: () => getOrder(orderId)
+    queryFn: () => getOrder(orderId),
+    // 결제 확인 중이면 서버 정산 결과가 곧 반영되므로 짧게 폴링한다
+    refetchInterval: (query) =>
+      query.state.data?.status === 'PAYMENT_PROCESSING' ? 5_000 : false
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+  const invalidate = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['order', orderId] }),
+    [queryClient, orderId]
+  );
 
   const refundMutation = useMutation({
     mutationFn: () => refundPayment(orderId, '고객 환불 요청'),
@@ -47,8 +54,17 @@ export function OrderDetailPage() {
     onError: (e) => toast(e instanceof ApiError ? e.message : '취소에 실패했어요.', 'error')
   });
 
+  // 만료된 주문은 서버가 곧 취소한다. 결제창을 띄워도 승인 단계에서 막히므로 미리 차단한다.
+  const expired = Boolean(
+    order?.paymentExpiresAt && new Date(order.paymentExpiresAt).getTime() <= Date.now()
+  );
+
   async function startPayment() {
     if (!order) return;
+    if (expired) {
+      toast('결제 시간이 만료되었어요. 다시 주문해주세요.', 'error');
+      return;
+    }
     setPaying(true);
     try {
       await requestTossPayment({
@@ -119,7 +135,13 @@ export function OrderDetailPage() {
 
             {order.status === 'PENDING_PAYMENT' && (
               <>
-                <div className="row" style={{ marginTop: 18 }}>
+                {order.paymentExpiresAt && (
+                  <div style={{ marginTop: 14 }}>
+                    {/* 만료되면 서버가 주문을 취소하므로, 그 순간 화면을 새로 불러온다 */}
+                    <PaymentCountdown expiresAt={order.paymentExpiresAt} onExpire={invalidate} />
+                  </div>
+                )}
+                <div className="row" style={{ marginTop: 16 }}>
                   {METHODS.map((m) => (
                     <button
                       key={m.key}
@@ -133,10 +155,10 @@ export function OrderDetailPage() {
                 <button
                   className="btn btn-buy"
                   style={{ width: '100%', marginTop: 16 }}
-                  disabled={paying}
+                  disabled={paying || expired}
                   onClick={startPayment}
                 >
-                  결제하기 <span className="chip">↗</span>
+                  {expired ? '결제 시간 만료' : <>결제하기 <span className="chip">↗</span></>}
                 </button>
                 <button
                   className="btn btn-danger btn-sm"
@@ -150,6 +172,29 @@ export function OrderDetailPage() {
                   테스트 환경이라 실제 돈은 출금되지 않아요.
                 </p>
               </>
+            )}
+
+            {/* 승인 결과를 기다리는 중 — 결제·취소 모두 막는다. 여기서 다시 요청하면
+                같은 결제가 두 번 진행되거나 승인 중 취소로 결제와 주문이 어긋날 수 있다. */}
+            {order.status === 'PAYMENT_PROCESSING' && (
+              <>
+                <div className="processing-note">
+                  <span className="dot-spin" />
+                  <span>
+                    결제 결과를 확인하고 있어요. 이 화면을 닫아도 처리는 계속되며,
+                    잠시 후 자동으로 갱신됩니다.
+                  </span>
+                </div>
+                <button className="btn btn-ghost" style={{ width: '100%', marginTop: 12 }} disabled>
+                  결제 확인 중…
+                </button>
+              </>
+            )}
+
+            {order.status === 'PAYMENT_FAILED' && (
+              <p className="text-muted" style={{ marginTop: 16, fontSize: 13 }}>
+                결제에 실패한 주문이에요.
+              </p>
             )}
 
             {order.status === 'COMPLETED' && (
