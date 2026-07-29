@@ -78,6 +78,7 @@ public enum ErrorCode {
     PAYMENT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 결제된 주문입니다."),
     PAYMENT_NOT_REFUNDABLE(HttpStatus.CONFLICT, "환불할 수 없는 결제 상태입니다."),
     PAYMENT_NOT_PENDING(HttpStatus.CONFLICT, "결제 대기 상태의 주문이 아닙니다."),
+    PAYMENT_NOT_PROCESSING(HttpStatus.CONFLICT, "결제 진행 중인 주문이 아닙니다."),
 	PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "결제 승인에 실패했습니다");
 
     private final HttpStatus status;

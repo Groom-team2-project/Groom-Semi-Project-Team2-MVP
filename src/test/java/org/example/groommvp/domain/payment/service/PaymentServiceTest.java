@@ -9,39 +9,54 @@ import org.example.groommvp.domain.order.entity.OrderStatus;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.payment.client.TossPaymentClient;
+import org.example.groommvp.domain.payment.dto.PaymentAttemptStarted;
 import org.example.groommvp.domain.payment.dto.PaymentRequest;
 import org.example.groommvp.domain.payment.dto.PaymentResponse;
 import org.example.groommvp.domain.payment.dto.RefundRequest;
 import org.example.groommvp.domain.payment.dto.RefundResponse;
 import org.example.groommvp.domain.payment.entity.Payment;
 import org.example.groommvp.domain.payment.entity.PaymentStatus;
-import org.example.groommvp.domain.payment.event.PaymentCompletedEvent;
 import org.example.groommvp.domain.payment.repository.PaymentRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
+import org.example.groommvp.domain.stock.entity.StockHistoryType;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
-import org.example.groommvp.domain.stock.entity.StockHistoryType;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.ArgumentCaptor;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClientException;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
+/**
+ * 결제 오케스트레이션 검증.
+ *
+ * <p>단계별 DB 작업은 {@link PaymentAttemptService} 가 독립 트랜잭션으로 수행하므로 Mock 으로 두고,
+ * 여기서는 "어떤 순서로 무엇을 호출하는가"를 검증한다. 특히 <b>토스 승인 전에 상태 전이가
+ * 커밋되는 순서</b>가 지켜지는지가 핵심이다.
+ */
 @ExtendWith(MockitoExtension.class)
-public class PaymentServiceTest {
+class PaymentServiceTest {
 
 	@Mock private OrderRepository orderRepository;
 	@Mock private OrderItemRepository orderItemRepository;
@@ -49,139 +64,78 @@ public class PaymentServiceTest {
 	@Mock private TossPaymentClient tossPaymentClient;   // 외부 호출은 Mock
 	@Mock private StockRepository stockRepository;
 	@Mock private StockHistoryRepository stockHistoryRepository;
-	@Mock private ApplicationEventPublisher eventPublisher;
+	@Mock private PaymentAttemptService paymentAttemptService;
 	@InjectMocks private PaymentService paymentService;
 
+	private static final String TOSS_ORDER_ID = "ORDER_1_1700000000000";
+
 	@Test
-	@DisplayName("결제 성공 시 토스 승인 후 상태가 PAID가 된다")
+	@DisplayName("결제 성공 시 '상태 전이 → 토스 승인 → 결과 반영' 순서로 진행된다")
 	void pay_success() {
 		// given
 		Long orderId = 1L;
-		Long productId = 10L;
-		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
-		ProductEntity product = product(productId);
-		OrderItem orderItem = new OrderItem(order, product, 1, 20000);
-		StockEntity stock = StockEntity.builder()
-			.product(product)
-			.stocks(1)
-			.build();
-		stock.reserve(1);
+		Order order = order(orderId, 20000L, OrderStatus.COMPLETED);
+		Payment payment = new Payment(order, 20000L, "CARD", "test_pk_123");
+		payment.pay();
+		PaymentRequest request = new PaymentRequest("test_pk_123", TOSS_ORDER_ID, "CARD");
 
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
-		given(paymentRepository.existsByOrder(order)).willReturn(false);
-		given(orderItemRepository.findByOrderIdWithProduct(orderId)).willReturn(List.of(orderItem));
-		given(stockRepository.findByProductIdWithPessimisticLock(productId)).willReturn(Optional.of(stock));
-		given(paymentRepository.saveAndFlush(any(Payment.class))).willAnswer(inv -> inv.getArgument(0));
+		// begin 이 서버가 보관한 주문 금액을 돌려준다
+		given(paymentAttemptService.begin(orderId, request))
+			.willReturn(new PaymentAttemptStarted(99L, 20000L));
+		given(paymentAttemptService.complete(orderId, 99L, request)).willReturn(payment);
 
 		// when
-		PaymentResponse response = paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_1_1700000000000", "CARD"));
+		PaymentResponse response = paymentService.pay(orderId, request);
 
 		// then
 		assertThat(response.status()).isEqualTo(PaymentStatus.PAID);
-		assertThat(response.paidAt()).isNotNull();
 
-		verify(tossPaymentClient).confirm("test_pk_123", "ORDER_1_1700000000000", 20000L);  // 서버 금액으로 승인 요청했는지
-		verify(paymentRepository).saveAndFlush(any(Payment.class));
+		// 토스 승인 전에 상태 전이가 끝나야 한다 (그래야 만료 스케줄러가 건드리지 못한다)
+		InOrder order1 = inOrder(paymentAttemptService, tossPaymentClient);
+		order1.verify(paymentAttemptService).begin(orderId, request);
+		order1.verify(tossPaymentClient).confirm("test_pk_123", TOSS_ORDER_ID, 20000L);
+		order1.verify(paymentAttemptService).complete(orderId, 99L, request);
 
-		ArgumentCaptor<StockHistoryEntity> historyCaptor = ArgumentCaptor.forClass(StockHistoryEntity.class);
-
-		assertThat(stock.getStocks()).isZero();
-		assertThat(stock.getReservedStocks()).isZero();
-		assertThat(order.getStatus()).isEqualTo(OrderStatus.COMPLETED);
-
-		verify(stockHistoryRepository).save(historyCaptor.capture());
-		StockHistoryEntity history = historyCaptor.getValue();
-		assertThat(history.getChangeType()).isEqualTo(StockHistoryType.CONFIRM);
-		assertThat(history.getOrderId()).isEqualTo(orderId);
-		assertThat(history.getChangedQty()).isEqualTo(1);
-
-		verify(eventPublisher).publishEvent(any(PaymentCompletedEvent.class));
+		verify(paymentAttemptService, never()).revert(anyLong(), anyLong(), anyString());
 	}
 
 	@Test
-	@DisplayName("이미 결제된 주문이면 토스 호출 없이 PAYMENT_ALREADY_EXISTS 예외가 발생한다")
-	void pay_alreadyExists() {
+	@DisplayName("토스 승인이 실패하면 주문을 결제 대기로 되돌리고 PAYMENT_FAILED를 던진다")
+	void pay_failed_revertsToPending() {
 		// given
 		Long orderId = 1L;
-		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
-		given(paymentRepository.existsByOrder(order)).willReturn(true);
-
-		// when & then
-		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_1_1700000000000", "CARD")))
-			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ALREADY_EXISTS);
-
-		// 사전 체크에서 막혀 토스 승인은 호출되지 않아야 한다
-		verify(tossPaymentClient, never()).confirm(any(), any(), anyLong());
-	}
-
-	@Test
-	@DisplayName("토스 승인이 실패하면 PAYMENT_FAILED 예외가 발생하고 주문/재고는 그대로다")
-	void pay_failed() {
-		// given
-		Long orderId = 1L;
-		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
-		given(paymentRepository.existsByOrder(order)).willReturn(false);
-
-		// 토스 승인 실패 시뮬레이션 (confirm이 예외를 던지도록)
-		doThrow(new RestClientException("toss error"))
+		PaymentRequest request = new PaymentRequest("test_pk_123", TOSS_ORDER_ID, "CARD");
+		given(paymentAttemptService.begin(orderId, request))
+			.willReturn(new PaymentAttemptStarted(99L, 20000L));
+		doThrow(new RestClientException("card declined"))
 			.when(tossPaymentClient).confirm(anyString(), anyString(), anyLong());
 
 		// when & then
-		assertThatThrownBy(() -> paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_1_1700000000000", "CARD")))
+		assertThatThrownBy(() -> paymentService.pay(orderId, request))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_FAILED);
 
-		// 실패 시 저장·재고확정·상태변경이 일어나지 않아야 한다 (롤백 → 재시도 가능)
-		assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-		verify(paymentRepository, never()).saveAndFlush(any());
-		verify(stockHistoryRepository, never()).save(any());
+		// 주문을 취소하지 않고 결제 대기로 되돌려 재시도할 수 있게 한다
+		verify(paymentAttemptService).revert(eq(orderId), eq(99L), anyString());
+		verify(paymentAttemptService, never()).complete(anyLong(), anyLong(), any());
 	}
 
 	@Test
-	@DisplayName("다른 주문의 주문번호로 결제하려 하면 토스 호출 없이 거부된다")
-	void pay_orderIdMismatch() {
-		// given: 주문 1번을 결제하는데 주문번호는 2번 것
+	@DisplayName("시작 단계에서 막히면 토스 승인은 호출되지 않는다")
+	void pay_beginRejected_doesNotCallToss() {
+		// given: 이미 결제된 주문이거나 중복 클릭 등으로 begin 이 거부하는 상황
 		Long orderId = 1L;
-		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
-		given(paymentRepository.existsByOrder(order)).willReturn(false);
+		PaymentRequest request = new PaymentRequest("test_pk_123", TOSS_ORDER_ID, "CARD");
+		given(paymentAttemptService.begin(orderId, request))
+			.willThrow(new BusinessException(ErrorCode.PAYMENT_ALREADY_EXISTS));
 
 		// when & then
-		assertThatThrownBy(() ->
-			paymentService.pay(orderId, new PaymentRequest("test_pk_123", "ORDER_2_1700000000000", "CARD")))
+		assertThatThrownBy(() -> paymentService.pay(orderId, request))
 			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+			.extracting("errorCode").isEqualTo(ErrorCode.PAYMENT_ALREADY_EXISTS);
 
 		verify(tossPaymentClient, never()).confirm(any(), any(), anyLong());
-	}
-
-	@Test
-	@DisplayName("결제 재시도 시 새 주문번호로 승인 요청한다 (토스 orderId 재사용 불가 대응)")
-	void pay_retryUsesNewOrderId() {
-		// given
-		Long orderId = 1L;
-		Long productId = 10L;
-		Order order = order(orderId, 20000L, OrderStatus.PENDING_PAYMENT);
-		ProductEntity product = product(productId);
-		OrderItem orderItem = new OrderItem(order, product, 1, 20000);
-		StockEntity stock = StockEntity.builder().product(product).stocks(1).build();
-		stock.reserve(1);
-
-		given(orderRepository.findById(orderId)).willReturn(Optional.of(order));
-		given(paymentRepository.existsByOrder(order)).willReturn(false);
-		given(orderItemRepository.findByOrderIdWithProduct(orderId)).willReturn(List.of(orderItem));
-		given(stockRepository.findByProductIdWithPessimisticLock(productId)).willReturn(Optional.of(stock));
-		given(paymentRepository.saveAndFlush(any(Payment.class))).willAnswer(inv -> inv.getArgument(0));
-
-		// when: 첫 시도가 실패한 뒤 새 주문번호로 재시도한 상황
-		String retryOrderId = "ORDER_1_1700000009999";
-		paymentService.pay(orderId, new PaymentRequest("test_pk_retry", retryOrderId, "CARD"));
-
-		// then: 이전 주문번호가 아니라 재시도 주문번호로 승인해야 한다
-		verify(tossPaymentClient).confirm("test_pk_retry", retryOrderId, 20000L);
+		verify(paymentAttemptService, never()).complete(anyLong(), anyLong(), any());
 	}
 
 	@Test
@@ -248,7 +202,7 @@ public class PaymentServiceTest {
 		Order o = status == OrderStatus.PENDING_PAYMENT
 			? Order.pendingPayment(totalPrice)
 			: new Order(totalPrice);
-		org.springframework.test.util.ReflectionTestUtils.setField(o, "id", id);
+		ReflectionTestUtils.setField(o, "id", id);
 		return o;
 	}
 
@@ -257,7 +211,7 @@ public class PaymentServiceTest {
 			.productName("테스트 상품")
 			.productPrice(20000)
 			.build();
-		org.springframework.test.util.ReflectionTestUtils.setField(product, "productId", id);
+		ReflectionTestUtils.setField(product, "productId", id);
 		return product;
 	}
 }
