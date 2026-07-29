@@ -49,7 +49,11 @@ export type ProductListItem = {
   productId: number;
   productName: string;
   productPrice: number;
+  stocks: number;
+  viewCount: number;
 };
+// 정렬
+export type ProductSortType = 'LATEST' | 'POPULAR' | 'VIEW_COUNT' | 'PRICE_ASC' | 'PRICE_DESC';
 
 export type ProductDetail = {
   productName: string;

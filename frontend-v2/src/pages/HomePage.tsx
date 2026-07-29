@@ -2,23 +2,51 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getProducts } from '../api/products';
+import { getCategoryTree } from '../api/categories';
+import type { ProductSortType } from '../api/types';
 import { ProductCard, ProductCardSkeleton, formatPrice, photoOf } from '../components/ProductCard';
 
 const MARQUEE_ITEMS = ['Just Dropped', 'Limited Edition', 'Sold Out Soon', 'Verified Authentic'];
+
+const SORT_OPTIONS: { value: ProductSortType; label: string }[] = [
+    { value: 'LATEST', label: '최신순' },
+    { value: 'POPULAR', label: '인기순' },
+    { value: 'VIEW_COUNT', label: '조회수순' },
+    { value: 'PRICE_ASC', label: '가격 낮은순' },
+    { value: 'PRICE_DESC', label: '가격 높은순' }
+];
 
 export function HomePage() {
   const [keyword, setKeyword] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
+  const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
+  const [sort, setSort] = useState<ProductSortType>('LATEST');
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['products', page, search],
-    queryFn: () => getProducts({ page, size: 12, keyword: search || undefined })
+  const { data: categories } = useQuery({
+    queryKey: ['categoryTree'],
+    queryFn: getCategoryTree,
+    staleTime: 5 * 60 * 1000
   });
+
+  const parentCategories = categories?.filter((c) => c.parentCategory == null) ?? [];
+  const childCategoriesByParent = new Map<number, typeof parentCategories>();
+    categories
+        ?.filter((c) => c.parentCategory != null)
+        .forEach((c) => {
+            const list = childCategoriesByParent.get(c.parentCategory as number) ?? [];
+            list.push(c);
+            childCategoriesByParent.set(c.parentCategory as number, list);
+        });
+
+    const { data, isLoading } = useQuery({
+        queryKey: ['products', page, search, categoryId, sort],
+        queryFn: () => getProducts({ page, size: 12, keyword: search || undefined, categoryId, sort })
+    });
 
   const totalPages = data ? Math.max(1, Math.ceil(data.totalElements / data.size)) : 1;
   const totalCount = data?.totalElements ?? 0;
-  const featured = !search && page === 0 ? data?.content[0] : undefined;
+  const featured = !search && !categoryId && page === 0 ? data?.content[0] : undefined;
 
   return (
     <>
@@ -63,65 +91,106 @@ export function HomePage() {
       </div>
 
       {/* 검색 + 섹션 헤더 */}
-      <div className="row between" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 14 }}>
-        <div>
-          <h2 className="h-section">{search ? `"${search}" 검색 결과` : 'New Drops'}</h2>
-          <span className="text-muted" style={{ fontSize: 13 }}>
+        <div className="row between" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 14 }}>
+            <div>
+                <h2 className="h-section">{search ? `"${search}" 검색 결과` : 'New Drops'}</h2>
+                <span className="text-muted" style={{ fontSize: 13 }}>
             {isLoading ? '불러오는 중' : `${totalCount}개의 드랍`}
           </span>
-        </div>
-        <form
-          className="row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPage(0);
-            setSearch(keyword.trim());
-          }}
-        >
-          <input
-            className="input"
-            style={{ borderRadius: 999, width: 240, paddingLeft: 18 }}
-            placeholder="드랍 검색"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-          />
-          <button className="btn btn-primary btn-sm" type="submit">검색</button>
-        </form>
-      </div>
+            </div>
+            <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+                <select
+                    className="input"
+                    style={{ borderRadius: 999, paddingRight: 28 }}
+                    value={categoryId ?? ''}
+                    onChange={(e) => {
+                        setPage(0);
+                        setCategoryId(e.target.value ? Number(e.target.value) : undefined);
+                    }}
+                >
+                    <option value="">전체 카테고리</option>
+                    {parentCategories.map((parent) => (
+                        <optgroup key={parent.categoryId} label={parent.categoryName}>
+                            {(childCategoriesByParent.get(parent.categoryId) ?? []).map((child) => (
+                                <option key={child.categoryId} value={child.categoryId}>
+                                    {child.categoryName}
+                                </option>
+                            ))}
+                        </optgroup>
+                    ))}
+                </select>
 
-      {isLoading ? (
-        <ProductCardSkeleton />
-      ) : !data || data.content.length === 0 ? (
-        <div className="empty rise">
-          <div className="empty-mark">S</div>
-          {search ? <>"{search}" 검색 결과가 없어요.</> : <>아직 등록된 드랍이 없어요. Admin에서 첫 상품을 등록해보세요.</>}
+                <select
+                    className="input"
+                    style={{ borderRadius: 999, paddingRight: 28 }}
+                    value={sort}
+                    onChange={(e) => {
+                        setPage(0);
+                        setSort(e.target.value as ProductSortType);
+                    }}
+                >
+                    {SORT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
+
+                <form
+                    className="row"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        setPage(0);
+                        setSearch(keyword.trim());
+                    }}
+                >
+                    <input
+                        className="input"
+                        style={{ borderRadius: 999, width: 200, paddingLeft: 18 }}
+                        placeholder="드랍 검색"
+                        value={keyword}
+                        onChange={(e) => setKeyword(e.target.value)}
+                    />
+                    <button className="btn btn-primary btn-sm" type="submit">검색</button>
+                </form>
+            </div>
         </div>
-      ) : (
-        <>
-          <div className="grid-products">
-            {data.content.map((p, i) => (
-              <ProductCard key={p.productId} product={p} index={i} />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className="row" style={{ justifyContent: 'center', marginTop: 44 }}>
-              <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                이전
-              </button>
-              <span className="text-muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
+
+        {isLoading ? (
+            <ProductCardSkeleton />
+        ) : !data || data.content.length === 0 ? (
+            <div className="empty rise">
+                <div className="empty-mark">S</div>
+                {search || categoryId
+                    ? <>{search && `"${search}" `}검색 결과가 없어요.</>
+                    : <>아직 등록된 드랍이 없어요. Admin에서 첫 상품을 등록해보세요.</>}
+            </div>
+        ) : (
+            <>
+                <div className="grid-products">
+                    {data.content.map((p, i) => (
+                        <ProductCard key={p.productId} product={p} index={i} />
+                    ))}
+                </div>
+                {totalPages > 1 && (
+                    <div className="row" style={{ justifyContent: 'center', marginTop: 44 }}>
+                        <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
+                            이전
+                        </button>
+                        <span className="text-muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {page + 1} / {totalPages}
               </span>
-              <button
-                className="btn btn-ghost btn-sm"
-                disabled={page + 1 >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                다음
-              </button>
-            </div>
-          )}
-        </>
-      )}
+                        <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={page + 1 >= totalPages}
+                            onClick={() => setPage(page + 1)}
+                        >
+                            다음
+                        </button>
+                    </div>
+                )}
+            </>
+        )}
 
       {/* 신뢰 배너 — 쇼핑몰다운 마감 */}
       <section
