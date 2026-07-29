@@ -14,6 +14,11 @@ export function getOrder(orderId: number | string) {
   return api<OrderResponse>(`/api/v1/orders/${orderId}`, { auth: true });
 }
 
+// 로그인한 사용자의 주문 목록. 결제 후 마이페이지에서 다시 찾아갈 수 있게 사용한다.
+export function getMyOrders() {
+  return api<OrderResponse[]>('/api/v1/members/me/orders', { auth: true });
+}
+
 export function cancelOrder(orderId: number | string) {
   return api<unknown>(`/api/v1/orders/${orderId}/cancel`, { method: 'POST', auth: true });
 }
