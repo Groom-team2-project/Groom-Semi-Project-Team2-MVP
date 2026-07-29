@@ -27,7 +27,11 @@ export function OrderDetailPage() {
     queryFn: () => getOrder(orderId)
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+    // 상태가 바뀌면 마이페이지 목록의 배지도 함께 낡는다.
+    queryClient.invalidateQueries({ queryKey: ['myOrders'] });
+  };
 
   const refundMutation = useMutation({
     mutationFn: () => refundPayment(orderId, '고객 환불 요청'),

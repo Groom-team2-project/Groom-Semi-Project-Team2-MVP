@@ -1,10 +1,74 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMe, updateMe } from '../api/members';
+import { getMyOrders } from '../api/orders';
 import { ApiError } from '../api/client';
+import { formatPrice } from '../components/ProductCard';
+import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { tokenStore } from '../lib/auth';
 import { startKakaoLogin } from '../api/auth';
+import type { OrderResponse } from '../api/types';
+
+// 백엔드가 타임존 없는 LocalDateTime 을 주므로 브라우저 로컬 형식으로 표시한다.
+// 파싱에 실패하면 원본 문자열을 그대로 보여준다 — 조용히 빈칸으로 만들지 않는다.
+function formatDateTime(value: string | null) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+// "티셔츠 외 2건" — 목록에서는 품목을 전부 펼치지 않고 요약만 보여준다.
+function summarizeItems(order: OrderResponse) {
+  const [first, ...rest] = order.orderItems;
+  if (!first) return '상품 정보 없음';
+  return rest.length > 0 ? `${first.productName} 외 ${rest.length}건` : first.productName;
+}
+
+function OrderRow({ order }: { order: OrderResponse }) {
+  const expired =
+    order.paymentExpiresAt !== null && new Date(order.paymentExpiresAt).getTime() < Date.now();
+
+  return (
+    <div className="bezel">
+      <div className="core row between" style={{ padding: 18, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div className="row" style={{ gap: 10 }}>
+            <Link to={`/orders/${order.orderId}`}>
+              <strong style={{ fontSize: 15 }}>주문 #{order.orderId}</strong>
+            </Link>
+            <StatusBadge status={order.status} />
+          </div>
+          <p className="text-muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {summarizeItems(order)} · {formatDateTime(order.createdAt)}
+          </p>
+
+          {/* 결제 대기 주문은 마감이 지나면 예약 재고가 회수되므로 남은 시간을 알려준다 */}
+          {order.status === 'PENDING_PAYMENT' && order.paymentExpiresAt && (
+            <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+              {expired
+                ? '결제 시간이 지나 곧 취소돼요.'
+                : `결제 마감 ${formatDateTime(order.paymentExpiresAt)}`}
+            </p>
+          )}
+          {order.status === 'CANCELED' && order.canceledAt && (
+            <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+              취소 {formatDateTime(order.canceledAt)}
+            </p>
+          )}
+        </div>
+
+        <div className="row" style={{ gap: 14 }}>
+          <b className="price">{formatPrice(order.totalPrice)}</b>
+          <Link to={`/orders/${order.orderId}`} className="btn btn-ghost btn-sm">
+            상세
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MyPage() {
   const toast = useToast();
@@ -15,6 +79,12 @@ export function MyPage() {
   const { data: me, isLoading } = useQuery({
     queryKey: ['me'],
     queryFn: getMe,
+    enabled: loggedIn
+  });
+
+  const { data: orders, isLoading: ordersLoading } = useQuery({
+    queryKey: ['myOrders'],
+    queryFn: getMyOrders,
     enabled: loggedIn
   });
 
@@ -81,11 +151,32 @@ export function MyPage() {
             />
             <button className="btn btn-primary btn-sm" disabled={updateMutation.isPending}>변경</button>
           </form>
-          <p className="text-muted" style={{ fontSize: 12 }}>
-            주문 내역 기능은 준비 중이에요. 결제 완료 메일에서 주문 번호를 확인할 수 있어요.
-          </p>
         </div>
       </div>
+
+      <section style={{ marginTop: 40 }} className="rise rise-2">
+        <div className="row between" style={{ marginBottom: 16 }}>
+          <h2 className="h-section" style={{ margin: 0 }}>주문 내역</h2>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['myOrders'] })}
+          >
+            새로고침
+          </button>
+        </div>
+
+        {ordersLoading ? (
+          <div className="spin" />
+        ) : !orders || orders.length === 0 ? (
+          <div className="empty">아직 주문이 없어요.</div>
+        ) : (
+          <div className="stack">
+            {orders.map((order) => (
+              <OrderRow key={order.orderId} order={order} />
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }

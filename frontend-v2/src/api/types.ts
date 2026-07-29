@@ -97,7 +97,12 @@ export type CartCheckoutResponse = {
 };
 
 // ---------- order ----------
-export type OrderStatus = 'PENDING_PAYMENT' | 'COMPLETED' | 'CANCELED' | 'PAYMENT_FAILED';
+export type OrderStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAYMENT_PROCESSING'
+  | 'COMPLETED'
+  | 'CANCELED'
+  | 'PAYMENT_FAILED';
 
 export type OrderItemResponse = {
   orderItemId: number;
@@ -113,6 +118,9 @@ export type OrderResponse = {
   status: OrderStatus;
   totalPrice: number;
   canceledAt: string | null;
+  // 결제 마감 시각. 이 시각이 지나면 예약 재고가 회수되고 주문이 취소된다.
+  // 결제 대기 주문에만 의미가 있고, 그 이전에 만들어진 주문은 null 이다.
+  paymentExpiresAt: string | null;
   createdAt: string;
   orderItems: OrderItemResponse[];
 };
