@@ -11,7 +11,15 @@ import java.time.LocalDateTime;
 
 @Entity
 @Getter
-@Table(name="reviews")
+@Table(
+        name = "reviews",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uq_reviews_active_review_key",
+                        columnNames = "active_review_key"
+                )
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ReviewEntity extends BaseEntity {
 
@@ -34,6 +42,16 @@ public class ReviewEntity extends BaseEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    @Column(
+            name = "active_review_key",
+            insertable = false,
+            updatable = false,
+            columnDefinition = "varchar(64) generated always as " +
+                    "(case when deleted_at is null then concat(product_id, '_', member_id) else null end) stored"
+    )
+    private String activeReviewKey;
+
 
     @Builder
     public ReviewEntity(Long productId, Long memberId, String content, Integer rating) {
