@@ -19,11 +19,11 @@ public class ImageResponse {
     @Schema(description = "상세 이미지")
     private final String detailImage;
 
-    public static ImageResponse from(ImageEntity image) {
+    public static ImageResponse from(ImageEntity image, String detailImageUrl) {
         return ImageResponse.builder()
                 .productId(image.getProduct().getProductId())
                 .imageId(image.getImageId())
-                .detailImage(image.getDetailImage())
+                .detailImage(detailImageUrl)
                 .build();
     }
 }

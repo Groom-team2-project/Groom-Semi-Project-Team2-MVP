@@ -1,9 +1,9 @@
 package org.example.groommvp.domain.product.service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.groommvp.domain.category.dto.CategoryResponse;
 import org.example.groommvp.domain.category.entity.CategoryEntity;
 import org.example.groommvp.domain.category.repository.CategoryRepository;
+import org.example.groommvp.domain.order.entity.OrderStatus;
 import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.entity.ImageEntity;
 import org.example.groommvp.domain.product.repository.ImageRepository;
@@ -12,13 +12,19 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
+import org.example.groommvp.global.storage.S3TransactionCleanup;
+import org.example.groommvp.global.storage.S3imageStorage;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.example.groommvp.domain.product.entity.ProductEntity;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -29,11 +35,13 @@ public class ProductServiceImpl implements ProductService{
     private final StockRepository stockRepository;
     private final CategoryRepository categoryRepository;
     private final ImageRepository imageRepository;
+    private final S3imageStorage s3imageStorage;
+    private final S3TransactionCleanup s3TransactionCleanup;
 
     //상품 등록
     @Override
     @Transactional
-    public ProductResponse createProduct(ProductCreateRequest request) {
+    public ProductResponse createProduct(ProductCreateRequest request, MultipartFile productImage) {
         //카테고리 확인
         CategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
@@ -41,13 +49,16 @@ public class ProductServiceImpl implements ProductService{
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_CATEGORY);
         }
 
+        String productImageKey = s3imageStorage.upload(productImage, "products/main");
+        s3TransactionCleanup.deleteAfterRollback(productImageKey);
+
         ProductEntity product = ProductEntity.builder()
                 .productName(request.getProductName())
                 .productPrice(request.getProductPrice())
-                .productImage(request.getProductImage())
+                .productImage(productImageKey)
                 .category(category)
                 .build();
-        ProductEntity savedProduct =  productRepository.save(product);
+        ProductEntity savedProduct = productRepository.save(product);
 
         StockEntity stock = StockEntity.builder()
                 .product(savedProduct)
@@ -55,13 +66,17 @@ public class ProductServiceImpl implements ProductService{
                 .build();
         stockRepository.save(stock);
 
-        return ProductResponse.from(product, stock);
+        return ProductResponse.from(
+                savedProduct,
+                stock,
+                s3imageStorage.toUrl(productImageKey)
+        );
     }
 
     //상품 수정
     @Override
     @Transactional
-    public ProductResponse updateProduct(Long productId, ProductUpdateRequest request) {
+    public ProductResponse updateProduct(Long productId, ProductUpdateRequest request, MultipartFile productImage) {
 
         ProductEntity product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)); //등록되지 않은 상품
@@ -78,14 +93,36 @@ public class ProductServiceImpl implements ProductService{
         StockEntity stock = stockRepository.findByProduct_ProductId(productId)
                         .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND));
 
+        String oldImageKey = product.getProductImage();
+        String newImageKey = oldImageKey;
+        boolean imageChanged = false;
+
+        if (productImage != null && !productImage.isEmpty()) {
+            newImageKey = s3imageStorage.upload(
+                    productImage,
+                    "products/main"
+            );
+            s3TransactionCleanup.deleteAfterRollback(newImageKey);
+            imageChanged = true;
+        }
+
         product.update(
                 request.getProductName(),
                 request.getProductPrice(),
-                request.getImageUrl(),
+                newImageKey,
                 category
         );
 
-        return ProductResponse.from(product, stock);
+        productRepository.saveAndFlush(product);
+        if (imageChanged) {
+            s3TransactionCleanup.deleteAfterCommit(oldImageKey);
+        }
+
+        return ProductResponse.from(
+                product,
+                stock,
+                s3imageStorage.toUrl(newImageKey)
+        );
     }
 
     //상품 삭제
@@ -103,14 +140,15 @@ public class ProductServiceImpl implements ProductService{
         if (stock.getStocks() > 0) {
             throw new BusinessException(ErrorCode.PRODUCT_STOCK_REMAINING);
         }
-        ProductResponse response = ProductResponse.from(product, stock);
-        productRepository.delete(product);
+        ProductResponse response = ProductResponse.from(product, stock, s3imageStorage.toUrl(product.getProductImage()));
+        product.delete();
 
         return response;
     }
 
     //상품 단건 조회
     @Override
+    @Transactional
     public ProductDetailResponse getProduct(Long productId) {
         ProductEntity product = productRepository.findById(productId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND)); //등록되지 않은 상품
@@ -123,18 +161,62 @@ public class ProductServiceImpl implements ProductService{
         List<ImageEntity> images = imageRepository
                 .findAllByProductProductIdOrderByImageIdAsc(productId);
 
-        return ProductDetailResponse.from(product, stock, images);
+        List<ImageResponse> detailImages = images.stream()
+                .map(image -> ImageResponse.from(image, s3imageStorage.toUrl(image.getDetailImage())))
+                .toList();
+
+        String productImageUrl = s3imageStorage.toUrl(product.getProductImage());
+
+        productRepository.incrementViewCount(productId);
+
+        return ProductDetailResponse.from(product, stock, productImageUrl, detailImages);
     }
 
+    //상품 목록 조회
     @Override
-    public Page<ProductListResponse> getProductList(String keyword, Pageable pageable) {
-        //검색어가 있으면 검색해서 페이징
-        if(keyword != null && !keyword.trim().isEmpty()) {
-            return productRepository.findByProductNameContaining(keyword, pageable)
-                    .map(ProductListResponse::from);
+    public Page<ProductListResponse> getProductList(
+            String keyword, Long categoryId, ProductSortType sortType, int page, int size
+    ) {
+        ProductSortType sort = sortType != null ? sortType : ProductSortType.LATEST;
+        String normalizedKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+
+        Page<ProductEntity> productPage;
+
+        if (sort == ProductSortType.POPULAR) {
+            // 인기순은 결제완료 주문건수 집계가 필요해서 별도 쿼리로 처리
+            Pageable pageable = PageRequest.of(page, size);
+            productPage = productRepository.findAllOrderByCompletedOrderCountDesc(
+                    normalizedKeyword, categoryId, OrderStatus.COMPLETED, pageable);
+        } else {
+            // 최신순/조회수순/가격순은 컬럼 하나 기준 정렬이라 Sort로 처리
+            Pageable pageable = PageRequest.of(page, size, resolveSort(sort));
+            productPage = productRepository.findAllByKeywordAndCategory(
+                    normalizedKeyword, categoryId, pageable);
         }
 
-        return productRepository.findAll(pageable)
-                .map(ProductListResponse::from);
+        // 재고 조회
+        List<Long> productIds = productPage.getContent().stream()
+                .map(ProductEntity::getProductId)
+                .toList();
+
+        Map<Long, StockEntity> stocksByProductId = stockRepository.findAllByProduct_ProductIdIn(productIds).stream()
+                .collect(Collectors.toMap(
+                        s -> s.getProduct().getProductId(),
+                        stock -> stock
+                ));
+
+        return productPage.map(product ->
+                ProductListResponse.from(product, stocksByProductId.get(product.getProductId())));
+    }
+
+    private Sort resolveSort(ProductSortType sortType) {
+        return switch (sortType) {
+            case VIEW_COUNT -> Sort.by(Sort.Direction.DESC, "viewCount").and(Sort.by(Sort.Direction.DESC, "productId"));
+            case PRICE_ASC ->
+                    Sort.by(Sort.Direction.ASC, "productPrice").and(Sort.by(Sort.Direction.DESC, "productId"));
+            case PRICE_DESC ->
+                    Sort.by(Sort.Direction.DESC, "productPrice").and(Sort.by(Sort.Direction.DESC, "productId"));
+            default -> Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "productId"));
+        };
     }
 }

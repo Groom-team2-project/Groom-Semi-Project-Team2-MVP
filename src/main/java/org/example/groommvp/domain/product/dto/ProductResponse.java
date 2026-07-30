@@ -24,16 +24,16 @@ public class ProductResponse {
     @Schema(description = "현재 재고 수량", example = "50")
     private final Integer stocks;
 
-    @Schema(description = "등록 카테고리", example = "2")
+    @Schema(description = "등록 카테고리", example = "2", nullable = true)
     private final Long category;
 
-    public static ProductResponse from(ProductEntity product, StockEntity stock) {
+    public static ProductResponse from(ProductEntity product, StockEntity stock, String productImageUrl) {
         return ProductResponse.builder()
                 .productName(product.getProductName())
                 .productPrice(product.getProductPrice())
-                .productImage(product.getProductImage())
+                .productImage(productImageUrl)
                 .stocks(stock.getStocks())
-                .category(product.getCategory().getCategoryId())
+                .category(product.getCategory() != null ? product.getCategory().getCategoryId() : null)
                 .build();
     }
 }
