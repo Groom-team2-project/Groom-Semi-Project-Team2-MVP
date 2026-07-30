@@ -11,6 +11,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.example.groommvp.domain.auth.service.JwtTokenProvider;
+import org.example.groommvp.domain.member.entity.AuthProvider;
+import org.example.groommvp.domain.member.entity.MemberEntity;
+import org.example.groommvp.domain.member.entity.MemberRole;
+import org.example.groommvp.domain.member.entity.MemberStatus;
+import org.example.groommvp.domain.member.repository.MemberRepository;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.order.repository.OrderRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
@@ -23,7 +29,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -34,6 +42,15 @@ class SystemScenarioMockMvcTest {
 
     @Autowired
     private WebApplicationContext webApplicationContext;
+
+    @Autowired
+    private FilterChainProxy springSecurityFilterChain;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private ProductRepository productRepository;
@@ -51,11 +68,30 @@ class SystemScenarioMockMvcTest {
     private OrderItemRepository orderItemRepository;
 
     private MockMvc mockMvc;
+    private String userAccessToken;
+    private String adminAccessToken;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .addFilters(springSecurityFilterChain)
+                .build();
         cleanUp();
+        MemberEntity user = memberRepository.save(MemberEntity.createKakaoMember(
+                "system-user",
+                "system-user@example.com",
+                "system-user"
+        ));
+        MemberEntity admin = memberRepository.save(MemberEntity.builder()
+                .provider(AuthProvider.KAKAO)
+                .providerId("system-admin")
+                .email("system-admin@example.com")
+                .nickname("system-admin")
+                .role(MemberRole.ADMIN)
+                .status(MemberStatus.ACTIVE)
+                .build());
+        userAccessToken = jwtTokenProvider.createAccessToken(user);
+        adminAccessToken = jwtTokenProvider.createAccessToken(admin);
     }
 
     @AfterEach
@@ -84,6 +120,10 @@ class SystemScenarioMockMvcTest {
                 .andExpect(jsonPath("$.data.currentStocks").value(100));
 
         mockMvc.perform(get("/api/v1/products/{productId}/stock-histories", productId))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/api/v1/products/{productId}/stock-histories", productId)
+                        .header(HttpHeaders.AUTHORIZATION, adminBearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.length()").value(1))
@@ -100,7 +140,8 @@ class SystemScenarioMockMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.stocks").value(100));
 
-        mockMvc.perform(get("/api/v1/products/{productId}/stock-histories", productId))
+        mockMvc.perform(get("/api/v1/products/{productId}/stock-histories", productId)
+                        .header(HttpHeaders.AUTHORIZATION, adminBearerToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].type").value("RESERVE"))
@@ -180,6 +221,7 @@ class SystemScenarioMockMvcTest {
 
     private void createProduct(String name, int price, int stocks) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/products")
+                        .header(HttpHeaders.AUTHORIZATION, adminBearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -201,6 +243,7 @@ class SystemScenarioMockMvcTest {
             String reason
     ) throws Exception {
         return mockMvc.perform(post("/api/v1/products/{productId}/stock-in", productId)
+                .header(HttpHeaders.AUTHORIZATION, adminBearerToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -212,6 +255,7 @@ class SystemScenarioMockMvcTest {
 
     private org.springframework.test.web.servlet.ResultActions purchase(Long productId, int quantity) throws Exception {
         return mockMvc.perform(post("/api/v1/products/{productId}/orders", productId)
+                .header(HttpHeaders.AUTHORIZATION, userBearerToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -226,5 +270,14 @@ class SystemScenarioMockMvcTest {
         orderRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         productRepository.deleteAllInBatch();
+        memberRepository.deleteAllInBatch();
+    }
+
+    private String userBearerToken() {
+        return "Bearer " + userAccessToken;
+    }
+
+    private String adminBearerToken() {
+        return "Bearer " + adminAccessToken;
     }
 }

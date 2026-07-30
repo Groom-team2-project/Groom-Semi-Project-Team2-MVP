@@ -14,6 +14,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.example.groommvp.domain.order.dto.PurchaseRequest;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.order.repository.OrderRepository;
+import org.example.groommvp.domain.auth.service.JwtTokenProvider;
+import org.example.groommvp.domain.member.entity.MemberEntity;
+import org.example.groommvp.domain.member.repository.MemberRepository;
 import org.example.groommvp.domain.product.entity.ProductEntity;
 import org.example.groommvp.domain.product.repository.ProductRepository;
 import org.example.groommvp.domain.stock.entity.StockEntity;
@@ -24,7 +27,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.web.FilterChainProxy;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -42,6 +47,15 @@ class PurchaseApiMockMvcTest {
     private WebApplicationContext webApplicationContext;
 
     @Autowired
+    private FilterChainProxy springSecurityFilterChain;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
     private ProductRepository productRepository;
 
     @Autowired
@@ -56,9 +70,19 @@ class PurchaseApiMockMvcTest {
     @Autowired
     private OrderItemRepository orderItemRepository;
 
+    private String accessToken;
+
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .addFilters(springSecurityFilterChain)
+                .build();
+        MemberEntity member = memberRepository.save(MemberEntity.createKakaoMember(
+                "purchase-api-member",
+                "purchase@example.com",
+                "purchase"
+        ));
+        accessToken = jwtTokenProvider.createAccessToken(member);
     }
 
     @AfterEach
@@ -68,6 +92,7 @@ class PurchaseApiMockMvcTest {
         orderRepository.deleteAllInBatch();
         stockRepository.deleteAllInBatch();
         productRepository.deleteAllInBatch();
+        memberRepository.deleteAllInBatch();
     }
 
     @Test
@@ -76,6 +101,7 @@ class PurchaseApiMockMvcTest {
         StockEntity stock = stockRepository.save(new StockEntity(product, 10));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":3}
@@ -105,6 +131,7 @@ class PurchaseApiMockMvcTest {
         stockRepository.save(new StockEntity(product, 10));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":0}
@@ -125,6 +152,7 @@ class PurchaseApiMockMvcTest {
         stockRepository.save(new StockEntity(product, 10));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":"invalid"}
@@ -142,6 +170,7 @@ class PurchaseApiMockMvcTest {
     @Test
     void purchaseApiReturnsBadRequestWhenProductIdHasInvalidType() throws Exception {
         mockMvc.perform(post("/api/v1/products/{productId}/orders", "abc")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":1}
@@ -155,6 +184,7 @@ class PurchaseApiMockMvcTest {
     @Test
     void purchaseApiReturnsNotFoundWhenProductDoesNotExist() throws Exception {
         mockMvc.perform(post("/api/v1/products/{productId}/orders", 999L)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":1}
@@ -170,6 +200,7 @@ class PurchaseApiMockMvcTest {
         ProductEntity product = productRepository.save(ProductEntity.builder().productName("No Stock Product").productPrice(10000).build());
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":1}
@@ -190,6 +221,7 @@ class PurchaseApiMockMvcTest {
         StockEntity stock = stockRepository.save(new StockEntity(product, 1));
 
         mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"quantity":2}
@@ -209,7 +241,8 @@ class PurchaseApiMockMvcTest {
 
     @Test
     void purchaseApiReturnsMethodNotAllowedWhenHttpMethodIsNotSupported() throws Exception {
-        mockMvc.perform(get("/api/v1/products/{productId}/orders", 1L))
+        mockMvc.perform(get("/api/v1/products/{productId}/orders", 1L)
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.data").doesNotExist())
@@ -237,6 +270,7 @@ class PurchaseApiMockMvcTest {
                     startLatch.await();
 
                     MvcResult result = mockMvc.perform(post("/api/v1/products/{productId}/orders", product.getProductId())
+                                    .header(HttpHeaders.AUTHORIZATION, bearerToken())
                                     .contentType(MediaType.APPLICATION_JSON)
                                     .content("""
                                             {"quantity":1}
@@ -276,5 +310,9 @@ class PurchaseApiMockMvcTest {
         assertThat(stockHistoryRepository.count()).isEqualTo(30);
         assertThat(stockHistoryRepository.findAll())
                 .allMatch(history -> history.getChangeType() == StockHistoryType.RESERVE);
+    }
+
+    private String bearerToken() {
+        return "Bearer " + accessToken;
     }
 }

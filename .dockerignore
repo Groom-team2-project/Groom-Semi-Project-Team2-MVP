@@ -1,0 +1,6 @@
+**
+!build/
+!build/libs/
+!build/libs/GroomMVP-0.0.1-SNAPSHOT.jar
+!performance/
+!performance/Dockerfile

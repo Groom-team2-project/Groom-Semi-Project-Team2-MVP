@@ -86,6 +86,8 @@ log/
 tmp/
 temp/
 outputs/
+performance/results/*
+!performance/results/.gitkeep
 
 # ========================
 # Spring Boot 관련

@@ -2,6 +2,8 @@ package org.example.groommvp.domain.event.service;
 
 import java.util.concurrent.TimeUnit;
 
+import org.example.groommvp.domain.event.config.EventLockProperties;
+import org.example.groommvp.domain.event.config.EventLockStrategy;
 import org.example.groommvp.domain.event.dto.FirstComeEventParticipateResponse;
 import org.example.groommvp.domain.event.entity.FirstComeEvent;
 import org.example.groommvp.domain.event.entity.FirstComeEventParticipant;
@@ -28,10 +30,22 @@ public class FirstComeEventService {
     private final FirstComeEventRepository eventRepository;
     private final FirstComeEventParticipantRepository participantRepository;
     private final TransactionTemplate transactionTemplate;
+    private final EventLockProperties lockProperties;
 
     public FirstComeEventParticipateResponse participate(Long eventId, Long memberId) {
+        if (lockProperties.strategy() == EventLockStrategy.PESSIMISTIC) {
+            return participateWithPessimisticLock(eventId, memberId);
+        }
+
+        return participateWithDistributedLock(eventId, memberId);
+    }
+
+    private FirstComeEventParticipateResponse participateWithDistributedLock(
+            Long eventId,
+            Long memberId
+    ) {
         String lockKey = EVENT_LOCK_KEY_FORMAT.formatted(eventId);
-        RLock lock = redissonClient.getLock(lockKey); // 이벤트별로 락 이름 생성
+        RLock lock = redissonClient.getLock(lockKey);
 
         boolean locked = false;
         try {
@@ -41,25 +55,7 @@ public class FirstComeEventService {
                 throw new BusinessException(ErrorCode.EVENT_LOCK_TIMEOUT);
             }
 
-            return transactionTemplate.execute(status -> {
-                FirstComeEvent event = eventRepository.findById(eventId)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-
-                // 같은 회원이 이미 참여했는지 확인
-                if (participantRepository.existsByEventIdAndMemberId(eventId, memberId)) {
-                    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-                }
-
-                event.participate(); // 남은 수량이 있으면 참여 수를 1 증가시킴
-                participantRepository.save(new FirstComeEventParticipant(event, memberId)); // 참여 기록을 DB에 저장
-
-                // 참여 성공 후 eventId, memberId, 남은 수량을 응답으로 돌려줌
-                return new FirstComeEventParticipateResponse(
-                        event.getId(),
-                        memberId,
-                        event.getRemainingCount()
-                );
-            });
+            return participateInTransaction(eventId, memberId, false);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR);
@@ -76,7 +72,7 @@ public class FirstComeEventService {
             if (locked) {
                 try {
                     if (lock.isHeldByCurrentThread()) {
-                        lock.unlock(); // 성공/실패와 상관없이 잡은 락은 다시 풀어줌
+                        lock.unlock();
                     }
                 } catch (RedisException | IllegalMonitorStateException e) {
                     // 운영 로그 수집기의 error 알림 대상으로 사용한다.
@@ -88,5 +84,38 @@ public class FirstComeEventService {
                 }
             }
         }
+    }
+
+    private FirstComeEventParticipateResponse participateWithPessimisticLock(
+            Long eventId,
+            Long memberId
+    ) {
+        return participateInTransaction(eventId, memberId, true);
+    }
+
+    private FirstComeEventParticipateResponse participateInTransaction(
+            Long eventId,
+            Long memberId,
+            boolean pessimistic
+    ) {
+        return transactionTemplate.execute(status -> {
+            FirstComeEvent event = (pessimistic
+                    ? eventRepository.findByIdWithPessimisticLock(eventId)
+                    : eventRepository.findById(eventId))
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+            if (participantRepository.existsByEventIdAndMemberId(eventId, memberId)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+
+            event.participate();
+            participantRepository.save(new FirstComeEventParticipant(event, memberId));
+
+            return new FirstComeEventParticipateResponse(
+                    event.getId(),
+                    memberId,
+                    event.getRemainingCount()
+            );
+        });
     }
 }
