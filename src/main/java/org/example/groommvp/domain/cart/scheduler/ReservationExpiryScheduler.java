@@ -33,7 +33,13 @@ public class ReservationExpiryScheduler {
 
     private final ReservationExpiryService reservationExpiryService;
 
-    /** 이 시간이 지나도록 결제되지 않은 주문의 예약을 회수한다. */
+    /**
+     * 결제 마감 시각이 <b>없는 옛 주문</b>을 판정할 때 쓰는 유예 시간.
+     *
+     * <p>주문에 {@code paymentExpiresAt} 이 생긴 뒤로 회수 시점은 주문 자신이 들고 있다.
+     * 이 값은 그 필드가 없던 시절의 주문을 위한 대체 기준이며, 체크아웃이 마감 시각을 계산할
+     * 때도 같은 키를 읽어 둘이 어긋나지 않게 한다. ({@code CartOrderService})
+     */
     private final Duration timeout;
 
     /** 한 번 실행에서 처리할 최대 주문 수. 밀린 물량이 한 번에 쏟아지지 않게 제한한다. */
@@ -50,8 +56,9 @@ public class ReservationExpiryScheduler {
 
     @Scheduled(fixedDelayString = "${cart.reservation.expiry.interval:PT1M}")
     public void releaseExpiredReservations() {
-        LocalDateTime threshold = LocalDateTime.now().minus(timeout);
-        List<Long> expiredOrderIds = reservationExpiryService.findExpiredOrderIds(threshold, batchSize);
+        LocalDateTime legacyThreshold = LocalDateTime.now().minus(timeout);
+        List<Long> expiredOrderIds =
+                reservationExpiryService.findExpiredOrderIds(legacyThreshold, batchSize);
         if (expiredOrderIds.isEmpty()) {
             return;
         }
@@ -74,8 +81,8 @@ public class ReservationExpiryScheduler {
             }
         }
 
-        log.info("예약 재고 회수 완료. 대상={}, 회수={}, 건너뜀={}, 실패={}, 기준시각={}",
-                expiredOrderIds.size(), released, skipped, failed, threshold);
+        log.info("예약 재고 회수 완료. 대상={}, 회수={}, 건너뜀={}, 실패={}, 옛주문 기준시각={}",
+                expiredOrderIds.size(), released, skipped, failed, legacyThreshold);
         if (expiredOrderIds.size() == batchSize) {
             // 상한에 걸렸다는 것은 아직 남아 있다는 뜻이다. 조용히 잘리지 않도록 남긴다.
             log.info("이번 주기 상한({})에 도달했습니다. 남은 대상은 다음 주기에 처리됩니다.", batchSize);

@@ -52,17 +52,28 @@ export const tokenStore = {
    * 화면 전체가 다시 로딩된다.
    */
   save(accessToken: string, refreshToken?: string) {
-    const changedMember = !isSameMember(localStorage.getItem(ACCESS_KEY), accessToken);
+    const previous = localStorage.getItem(ACCESS_KEY);
+    // 이전 토큰이 없으면 화면에 남아 있는 건 비로그인 데이터(상품 목록 등)뿐이라 지울 이유가 없다.
+    // 괜히 비우면 게스트로 둘러보다 로그인한 사용자가 목록을 처음부터 다시 받는다.
+    const changedMember = previous !== null && !isSameMember(previous, accessToken);
     localStorage.setItem(ACCESS_KEY, accessToken);
     if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
     if (changedMember) queryClient.clear();
   },
 
-  /** 토큰을 지운다. (로그아웃 / 재발급 실패) 남은 데이터가 다음 로그인에 새지 않도록 캐시도 비운다. */
+  /**
+   * 토큰을 지운다. (로그아웃 / 재발급 실패) 남은 데이터가 다음 로그인에 새지 않도록 캐시도 비운다.
+   *
+   * <p><b>토큰이 있었을 때만 캐시를 비운다.</b> 이 메서드는 401 응답을 받은 요청 안에서도
+   * 불린다({@code api/client.ts}). 무조건 비우면 캐시 초기화 → 마운트된 쿼리 재조회 → 또 401 →
+   * 다시 초기화가 맞물려 요청이 끊임없이 반복될 수 있다. 두 번째 호출부터는 토큰이 이미 없으므로
+   * 여기서 고리가 끊긴다.
+   */
   clear() {
+    const hadToken = localStorage.getItem(ACCESS_KEY) !== null;
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
-    queryClient.clear();
+    if (hadToken) queryClient.clear();
   },
 
   isLoggedIn: () => Boolean(localStorage.getItem(ACCESS_KEY))
