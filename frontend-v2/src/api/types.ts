@@ -49,12 +49,17 @@ export type ProductListItem = {
   productId: number;
   productName: string;
   productPrice: number;
+  stocks: number;
+  reservedStocks: number;
+  availableStocks: number;
 };
 
 export type ProductDetail = {
   productName: string;
   productPrice: number;
   stocks: number;
+  reservedStocks: number;
+  availableStocks: number;
 };
 
 export type CategoryResponse = {
@@ -99,7 +104,7 @@ export type CartCheckoutResponse = {
 // ---------- order ----------
 export type OrderStatus =
   | 'PENDING_PAYMENT'
-  | 'PAYMENT_PROCESSING'
+  | 'PAYMENT_PROCESSING'   // 토스 승인 결과를 기다리는 중 — 결제·취소 모두 불가
   | 'COMPLETED'
   | 'CANCELED'
   | 'PAYMENT_FAILED';
@@ -118,8 +123,7 @@ export type OrderResponse = {
   status: OrderStatus;
   totalPrice: number;
   canceledAt: string | null;
-  // 결제 마감 시각. 이 시각이 지나면 예약 재고가 회수되고 주문이 취소된다.
-  // 결제 대기 주문에만 의미가 있고, 그 이전에 만들어진 주문은 null 이다.
+  /** 이 시각까지 결제하지 않으면 예약 재고가 해제되고 주문이 취소된다 */
   paymentExpiresAt: string | null;
   createdAt: string;
   orderItems: OrderItemResponse[];

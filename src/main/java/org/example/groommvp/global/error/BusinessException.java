@@ -27,13 +27,7 @@ public class BusinessException extends RuntimeException {
         this.errorCode = errorCode;
     }
 
-    /**
-     * 하위 계층의 예외를 업무 예외로 변환할 때 사용한다.
-     *
-     * <p>DB 제약 위반처럼 원인 예외에 진단 정보(위반한 제약 이름 등)가 담겨 있는 경우,
-     * 이를 버리면 "어떤 제약이 왜 깨졌는지" 를 로그에서 추적할 수 없다. 원인을 함께 넘겨
-     * 스택트레이스에 남긴다.
-     */
+    /** 원인 예외를 보존하면서 공통 오류 코드로 변환할 때 사용한다. */
     public BusinessException(ErrorCode errorCode, Throwable cause) {
         super(errorCode.getMessage(), cause);
         this.errorCode = errorCode;

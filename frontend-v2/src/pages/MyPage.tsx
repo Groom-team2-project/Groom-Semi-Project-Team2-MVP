@@ -4,11 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMe, updateMe } from '../api/members';
 import { getMyOrders } from '../api/orders';
 import { ApiError } from '../api/client';
-import { formatPrice } from '../components/ProductCard';
-import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../components/Toast';
 import { tokenStore } from '../lib/auth';
 import { startKakaoLogin } from '../api/auth';
+import { StatusBadge } from '../components/StatusBadge';
+import { formatPrice } from '../components/ProductCard';
 import type { OrderResponse } from '../api/types';
 
 // 백엔드가 타임존 없는 LocalDateTime 을 주므로 브라우저 로컬 형식으로 표시한다.
@@ -26,48 +26,24 @@ function summarizeItems(order: OrderResponse) {
   return rest.length > 0 ? `${first.productName} 외 ${rest.length}건` : first.productName;
 }
 
-function OrderRow({ order }: { order: OrderResponse }) {
-  const expired =
-    order.paymentExpiresAt !== null && new Date(order.paymentExpiresAt).getTime() < Date.now();
-
-  return (
-    <div className="bezel">
-      <div className="core row between" style={{ padding: 18, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div className="row" style={{ gap: 10 }}>
-            <Link to={`/orders/${order.orderId}`}>
-              <strong style={{ fontSize: 15 }}>주문 #{order.orderId}</strong>
-            </Link>
-            <StatusBadge status={order.status} />
-          </div>
-          <p className="text-muted" style={{ fontSize: 13, marginTop: 4 }}>
-            {summarizeItems(order)} · {formatDateTime(order.createdAt)}
-          </p>
-
-          {/* 결제 대기 주문은 마감이 지나면 예약 재고가 회수되므로 남은 시간을 알려준다 */}
-          {order.status === 'PENDING_PAYMENT' && order.paymentExpiresAt && (
-            <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
-              {expired
-                ? '결제 시간이 지나 곧 취소돼요.'
-                : `결제 마감 ${formatDateTime(order.paymentExpiresAt)}`}
-            </p>
-          )}
-          {order.status === 'CANCELED' && order.canceledAt && (
-            <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
-              취소 {formatDateTime(order.canceledAt)}
-            </p>
-          )}
-        </div>
-
-        <div className="row" style={{ gap: 14 }}>
-          <b className="price">{formatPrice(order.totalPrice)}</b>
-          <Link to={`/orders/${order.orderId}`} className="btn btn-ghost btn-sm">
-            상세
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+// 결제 대기 주문에만 붙는 한 줄. 마감이 지나면 곧 서버가 취소하므로 그 사실을 알린다.
+function OrderNote({ order }: { order: OrderResponse }) {
+  if (order.status === 'PENDING_PAYMENT' && order.paymentExpiresAt) {
+    const expired = new Date(order.paymentExpiresAt).getTime() <= Date.now();
+    return (
+      <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+        {expired ? '결제 시간이 지나 곧 취소돼요.' : `결제 마감 ${formatDateTime(order.paymentExpiresAt)}`}
+      </p>
+    );
+  }
+  if (order.status === 'CANCELED' && order.canceledAt) {
+    return (
+      <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+        취소 {formatDateTime(order.canceledAt)}
+      </p>
+    );
+  }
+  return null;
 }
 
 export function MyPage() {
@@ -82,8 +58,14 @@ export function MyPage() {
     enabled: loggedIn
   });
 
-  const { data: orders, isLoading: ordersLoading } = useQuery({
-    queryKey: ['myOrders'],
+  const {
+    data: orders,
+    isLoading: isOrdersLoading,
+    isError: isOrdersError,
+    error: ordersError,
+    refetch: refetchOrders
+  } = useQuery({
+    queryKey: ['my-orders'],
     queryFn: getMyOrders,
     enabled: loggedIn
   });
@@ -154,28 +136,49 @@ export function MyPage() {
         </div>
       </div>
 
-      <section style={{ marginTop: 40 }} className="rise rise-2">
-        <div className="row between" style={{ marginBottom: 16 }}>
-          <h2 className="h-section" style={{ margin: 0 }}>주문 내역</h2>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['myOrders'] })}
-          >
-            새로고침
-          </button>
-        </div>
-
-        {ordersLoading ? (
-          <div className="spin" />
-        ) : !orders || orders.length === 0 ? (
-          <div className="empty">아직 주문이 없어요.</div>
-        ) : (
-          <div className="stack">
-            {orders.map((order) => (
-              <OrderRow key={order.orderId} order={order} />
-            ))}
+      <section className="bezel rise rise-2" style={{ marginTop: 24 }}>
+        <div className="core">
+          <div className="row between" style={{ marginBottom: 14 }}>
+            <h2 className="h-section">내 주문 내역</h2>
+            <button className="btn btn-ghost btn-sm" onClick={() => refetchOrders()}>
+              새로고침
+            </button>
           </div>
-        )}
+
+          {isOrdersLoading ? (
+            <div className="spin" />
+          ) : isOrdersError ? (
+            <div className="empty">
+              <p>주문 내역을 불러오지 못했어요. {ordersError instanceof ApiError ? ordersError.message : ''}</p>
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => refetchOrders()}>
+                다시 시도
+              </button>
+            </div>
+          ) : !orders?.length ? (
+            <p className="text-muted">아직 주문 내역이 없어요.</p>
+          ) : (
+            <div className="stack">
+              {orders.map((order) => (
+                <Link
+                  key={order.orderId}
+                  to={`/orders/${order.orderId}`}
+                  className="row between"
+                  style={{ padding: '14px 0', borderTop: '1px solid var(--line)' }}
+                >
+                  <div>
+                    <strong>주문 #{order.orderId}</strong>
+                    <p className="text-muted" style={{ fontSize: 13, marginTop: 4 }}>
+                      {summarizeItems(order)} · {formatDateTime(order.createdAt)} ·{' '}
+                      {formatPrice(order.totalPrice)}
+                    </p>
+                    <OrderNote order={order} />
+                  </div>
+                  <StatusBadge status={order.status} />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </>
   );

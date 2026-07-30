@@ -157,7 +157,8 @@ class ReservationExpiryServiceTest {
     void releaseReservation_skipsPaidOrder() {
         Long orderId = checkoutWithQuantity(3);
         Order order = orderRepository.findById(orderId).orElseThrow();
-        order.completePayment();
+        order.startPayment();      // 승인 요청 → PAYMENT_PROCESSING
+        order.completePayment();   // 승인 성공 → COMPLETED
         orderRepository.saveAndFlush(order);
 
         boolean released = reservationExpiryService.releaseReservation(orderId);
@@ -167,6 +168,31 @@ class ReservationExpiryServiceTest {
         assertThat(reloadStock().getAvailableStocks()).isEqualTo(INITIAL_STOCK - 3);
         assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
                 .isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("승인 요청 중인 주문(PAYMENT_PROCESSING)은 만료 대상에서 제외된다")
+    void releaseReservation_skipsPaymentProcessingOrder() {
+        // given: 사용자가 결제 버튼을 눌러 토스 승인 요청이 나간 상태
+        Long orderId = checkoutWithQuantity(3);
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        order.startPayment();
+        orderRepository.saveAndFlush(order);
+        // 만료 시각이 지나도록 오래된 주문으로 만든다
+        ageOrder(orderId, LocalDateTime.now().minusHours(2));
+
+        // when: 그사이 만료 스케줄러가 돌았다
+        List<Long> expired = reservationExpiryService.findExpiredOrderIds(
+                LocalDateTime.now().minusMinutes(30), 100);
+        boolean released = reservationExpiryService.releaseReservation(orderId);
+
+        // then: 승인 중인 주문은 조회 대상도 아니고, 직접 호출해도 회수되지 않아야 한다.
+        //       그래야 "토스는 결제 성공, 주문은 취소"가 되는 상황을 막을 수 있다.
+        assertThat(expired).doesNotContain(orderId);
+        assertThat(released).isFalse();
+        assertThat(reloadStock().getAvailableStocks()).isEqualTo(INITIAL_STOCK - 3);  // 예약 유지
+        assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PAYMENT_PROCESSING);
     }
 
     @Test

@@ -15,6 +15,6 @@ public interface StockHistoryRepository extends JpaRepository<StockHistoryEntity
      */
     @Query("select h from StockHistoryEntity h "
             + "where h.stock.product.productId = :productId "
-            + "order by h.createdAt desc")
+            + "order by h.createdAt desc, h.historyId desc")
     List<StockHistoryEntity> findHistoriesByProductId(@Param("productId") Long productId);
 }

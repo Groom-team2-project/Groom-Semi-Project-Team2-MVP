@@ -14,8 +14,7 @@ export function getOrder(orderId: number | string) {
   return api<OrderResponse>(`/api/v1/orders/${orderId}`, { auth: true });
 }
 
-// 내 주문 내역 — 최신순. 서버가 원본이라 기기·브라우저가 달라도 동일하게 보인다.
-// (토큰의 회원 기준이므로 남의 주문이 섞이지 않는다)
+// 로그인한 사용자의 주문 목록. 결제 후 마이페이지에서 다시 찾아갈 수 있게 사용한다.
 export function getMyOrders() {
   return api<OrderResponse[]>('/api/v1/members/me/orders', { auth: true });
 }
