@@ -162,9 +162,19 @@ class PartEPerformanceTest {
         // 캐시만 비워야 히트/미스 비교가 같은 대상에 대한 비교가 된다.
         Cache cartCache = cacheManager.getCache(CartCacheNames.CART);
         assertThat(cartCache).as("장바구니 캐시가 설정되어 있어야 미스/히트를 비교할 수 있다").isNotNull();
-        Result miss = measure("장바구니 조회 (캐시 미스)", () -> {
-            cartCache.evict(memberId);
-            cartService.getMyCart(memberId);
+
+        // 캐시 키(=회원)를 스레드마다 따로 준다. 한 회원을 32 스레드가 공유하면 A 가 비운 직후
+        // B 가 적재해 버려 나머지는 히트가 된다 — "미스" 를 잰다고 하고 실제로는 섞인 값을 잰다.
+        List<Long> missMemberIds = new ArrayList<>();
+        for (int i = 0; i < THREADS; i++) {
+            Long missMemberId = newMember("perf-cart-miss-" + i).getMemberId();
+            cartService.addItem(missMemberId, new CartItemAddRequest(productId, 1));
+            missMemberIds.add(missMemberId);
+        }
+        Result miss = measurePerThread("장바구니 조회 (캐시 미스)", threadIndex -> {
+            Long missMemberId = missMemberIds.get(threadIndex % missMemberIds.size());
+            cartCache.evict(missMemberId);
+            cartService.getMyCart(missMemberId);
             return null;
         });
 

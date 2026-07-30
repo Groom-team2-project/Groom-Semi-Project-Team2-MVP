@@ -695,7 +695,13 @@ export default function App() {
       return;
     }
 
-    const result = await run<OrderDetail>('주문 조회', 'GET', `/api/v1/orders/${nextOrderId}`, undefined, true);
+    const requestToken = token;
+    const result = await run<OrderDetail>('주문 조회', 'GET', `/api/v1/orders/${nextOrderId}`,
+      undefined, true, requestToken || undefined);
+    // 늦게 도착한 이전 회원의 주문이 새 계정 화면을 덮어쓰지 않도록 막는다.
+    if (activeTokenRef.current !== requestToken) {
+      return;
+    }
     const data = unwrapData<OrderDetail>(result);
 
     if (data) {
@@ -812,7 +818,14 @@ export default function App() {
     }
   }
   async function getCart() {
-    applyCart(await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true));
+    const requestToken = token;
+    const res = await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true,
+      requestToken || undefined);
+    // 응답이 도착하기 전에 계정이 바뀌었다면 버린다. (개인 조회는 모두 같은 가드를 쓴다)
+    if (activeTokenRef.current !== requestToken) {
+      return;
+    }
+    applyCart(res);
   }
   async function addCartItem() {
     applyCart(await run('장바구니 담기', 'POST', '/api/v1/carts/items', {
