@@ -43,6 +43,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 	 * <p>{@code paymentExpiresAt} 이 없는 옛 주문은 이 필드가 생기기 전에 만들어진 것들이라
 	 * 예전 방식대로 생성 시각으로 판정한다.
 	 *
+	 * <p><b>정렬도 판정과 같은 기준이어야 한다.</b> 생성 순으로 정렬하면 배치 상한에 걸렸을 때
+	 * 먼저 만료된 주문이 뒤로 밀린다 — 짧은 마감을 준 새 주문이 오래된 주문에 가려 계속 밀리는 식이다.
+	 * 동률은 ID 로 끊어 매 주기 같은 순서를 보장한다.
+	 *
 	 * @param now              현재 시각. 마감이 이 시각을 지난 주문이 대상
 	 * @param legacyThreshold  마감 시각이 없는 옛 주문용 — 이 시각 이전에 생성됐으면 대상
 	 * @param pageable         한 번에 처리할 최대 건수 (밀린 물량이 한 트랜잭션을 오래 잡지 않도록 제한)
@@ -51,7 +55,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 			+ "where o.status = :status "
 			+ "and ((o.paymentExpiresAt is not null and o.paymentExpiresAt <= :now) "
 			+ "  or (o.paymentExpiresAt is null and o.createdAt < :legacyThreshold)) "
-			+ "order by o.createdAt asc")
+			+ "order by coalesce(o.paymentExpiresAt, o.createdAt) asc, o.id asc")
 	List<Long> findIdsByStatusExpiredBefore(@Param("status") OrderStatus status,
 			@Param("now") LocalDateTime now,
 			@Param("legacyThreshold") LocalDateTime legacyThreshold,
