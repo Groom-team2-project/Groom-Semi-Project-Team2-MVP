@@ -9,6 +9,42 @@ import { tokenStore } from '../lib/auth';
 import { startKakaoLogin } from '../api/auth';
 import { StatusBadge } from '../components/StatusBadge';
 import { formatPrice } from '../components/ProductCard';
+import type { OrderResponse } from '../api/types';
+
+// 백엔드가 타임존 없는 LocalDateTime 을 주므로 브라우저 로컬 형식으로 표시한다.
+// 파싱에 실패하면 원본 문자열을 그대로 보여준다 — 조용히 빈칸으로 만들지 않는다.
+function formatDateTime(value: string | null) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+// "티셔츠 외 2건" — 목록에서는 품목을 전부 펼치지 않고 요약만 보여준다.
+function summarizeItems(order: OrderResponse) {
+  const [first, ...rest] = order.orderItems;
+  if (!first) return '상품 정보 없음';
+  return rest.length > 0 ? `${first.productName} 외 ${rest.length}건` : first.productName;
+}
+
+// 결제 대기 주문에만 붙는 한 줄. 마감이 지나면 곧 서버가 취소하므로 그 사실을 알린다.
+function OrderNote({ order }: { order: OrderResponse }) {
+  if (order.status === 'PENDING_PAYMENT' && order.paymentExpiresAt) {
+    const expired = new Date(order.paymentExpiresAt).getTime() <= Date.now();
+    return (
+      <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+        {expired ? '결제 시간이 지나 곧 취소돼요.' : `결제 마감 ${formatDateTime(order.paymentExpiresAt)}`}
+      </p>
+    );
+  }
+  if (order.status === 'CANCELED' && order.canceledAt) {
+    return (
+      <p className="text-muted" style={{ fontSize: 12, marginTop: 2 }}>
+        취소 {formatDateTime(order.canceledAt)}
+      </p>
+    );
+  }
+  return null;
+}
 
 export function MyPage() {
   const toast = useToast();
@@ -22,7 +58,13 @@ export function MyPage() {
     enabled: loggedIn
   });
 
-  const { data: orders, isLoading: isOrdersLoading, isError: isOrdersError, error: ordersError, refetch: refetchOrders } = useQuery({
+  const {
+    data: orders,
+    isLoading: isOrdersLoading,
+    isError: isOrdersError,
+    error: ordersError,
+    refetch: refetchOrders
+  } = useQuery({
     queryKey: ['my-orders'],
     queryFn: getMyOrders,
     enabled: loggedIn
@@ -117,12 +159,19 @@ export function MyPage() {
           ) : (
             <div className="stack">
               {orders.map((order) => (
-                <Link key={order.orderId} to={`/orders/${order.orderId}`} className="row between" style={{ padding: '14px 0', borderTop: '1px solid var(--line)' }}>
+                <Link
+                  key={order.orderId}
+                  to={`/orders/${order.orderId}`}
+                  className="row between"
+                  style={{ padding: '14px 0', borderTop: '1px solid var(--line)' }}
+                >
                   <div>
                     <strong>주문 #{order.orderId}</strong>
                     <p className="text-muted" style={{ fontSize: 13, marginTop: 4 }}>
-                      {new Date(order.createdAt).toLocaleString()} · {formatPrice(order.totalPrice)}
+                      {summarizeItems(order)} · {formatDateTime(order.createdAt)} ·{' '}
+                      {formatPrice(order.totalPrice)}
                     </p>
+                    <OrderNote order={order} />
                   </div>
                   <StatusBadge status={order.status} />
                 </Link>

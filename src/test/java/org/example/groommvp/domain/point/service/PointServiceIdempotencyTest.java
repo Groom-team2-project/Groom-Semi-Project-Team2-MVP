@@ -80,7 +80,8 @@ class PointServiceIdempotencyTest {
 
         assertThat(balance).isEqualTo(700);
         assertThat(pointHistoryRepository
-                .findByMember_MemberIdAndOrderIdAndType(memberId, ORDER_ID, PointHistoryType.USE))
+                .findFirstByMember_MemberIdAndOrderIdAndTypeOrderByPointHistoryIdAsc(
+                        memberId, ORDER_ID, PointHistoryType.USE))
                 .isPresent();
     }
 

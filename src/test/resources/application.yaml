@@ -39,6 +39,15 @@ app:
     secret: test-jwt-secret-key-for-auth-context
     access-token-expiration-seconds: 7200
 
+  # S3Config 가 app.storage.region 을 @Value 로 받으므로, 값이 없으면 s3Client 빈이 만들어지지
+  # 않아 모든 @SpringBootTest 컨텍스트 로딩이 실패한다. (spring.mail 과 같은 이유)
+  # 이 파일이 main 의 application.yaml 을 가리므로 여기에도 값을 둬야 한다.
+  # 테스트는 실제로 S3 를 호출하지 않는다 — 빈 생성만 통과시키는 더미 값이다.
+  storage:
+    bucket: test-bucket
+    region: us-west-2
+    public-base-url: http://localhost:8080/test-bucket
+
 toss:
   secret-key: test-dummy-secret-key
   confirm-url: http://localhost:8080/toss/confirm

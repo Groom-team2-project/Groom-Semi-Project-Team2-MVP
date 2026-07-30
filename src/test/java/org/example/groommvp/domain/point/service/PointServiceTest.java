@@ -119,7 +119,8 @@ class PointServiceTest {
         given(pointHistoryRepository.existsByMember_MemberIdAndOrderIdAndType(MEMBER_ID, 42L, PointHistoryType.CANCEL))
                 .willReturn(false);
         // 그 주문에서 실제 사용한 포인트는 300 (호출자가 주는 금액이 아니라 이력에서 도출)
-        given(pointHistoryRepository.findByMember_MemberIdAndOrderIdAndType(MEMBER_ID, 42L, PointHistoryType.USE))
+        given(pointHistoryRepository.findFirstByMember_MemberIdAndOrderIdAndTypeOrderByPointHistoryIdAsc(
+                MEMBER_ID, 42L, PointHistoryType.USE))
                 .willReturn(Optional.of(PointHistoryEntity.of(member(), PointHistoryType.USE, 300, 0, 42L)));
 
         long result = pointService.cancelUse(MEMBER_ID, 42L);
@@ -151,12 +152,12 @@ class PointServiceTest {
     void earn_createsBalanceWhenAbsent() {
         given(memberRepository.findByIdWithPessimisticLock(MEMBER_ID)).willReturn(Optional.of(member()));
         given(pointBalanceRepository.findByMember_MemberId(MEMBER_ID)).willReturn(Optional.empty());
-        given(pointBalanceRepository.save(any(PointBalanceEntity.class))).willReturn(balanceWith(0));
+        given(pointBalanceRepository.saveAndFlush(any(PointBalanceEntity.class))).willReturn(balanceWith(0));
 
         pointService.earn(MEMBER_ID, 500, null);
 
         verify(memberRepository).findByIdWithPessimisticLock(MEMBER_ID);
-        verify(pointBalanceRepository).save(any(PointBalanceEntity.class));
+        verify(pointBalanceRepository).saveAndFlush(any(PointBalanceEntity.class));
         // 없는 잔액 행을 FOR UPDATE 하면 갭 락이 잡혀 서로 다른 회원끼리도 교착한다.
         verify(pointBalanceRepository, never()).findByMemberIdWithPessimisticLock(any());
     }
@@ -166,7 +167,7 @@ class PointServiceTest {
     void earn_convertsUniqueConstraintViolationOnFirstCreate() {
         given(memberRepository.findByIdWithPessimisticLock(MEMBER_ID)).willReturn(Optional.of(member()));
         given(pointBalanceRepository.findByMember_MemberId(MEMBER_ID)).willReturn(Optional.empty());
-        given(pointBalanceRepository.save(any(PointBalanceEntity.class)))
+        given(pointBalanceRepository.saveAndFlush(any(PointBalanceEntity.class)))
                 .willThrow(new DataIntegrityViolationException("duplicate member_id"));
 
         assertThatThrownBy(() -> pointService.earn(MEMBER_ID, 500, null))
