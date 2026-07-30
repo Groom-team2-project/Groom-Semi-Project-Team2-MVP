@@ -53,6 +53,7 @@ export type ProductListItem = {
   viewCount: number;
   reservedStocks: number;
   availableStocks: number;
+  viewCount: number;
 };
 // 정렬
 export type ProductSortType = 'LATEST' | 'POPULAR' | 'VIEW_COUNT' | 'PRICE_ASC' | 'PRICE_DESC';
@@ -60,9 +61,12 @@ export type ProductSortType = 'LATEST' | 'POPULAR' | 'VIEW_COUNT' | 'PRICE_ASC' 
 export type ProductDetail = {
   productName: string;
   productPrice: number;
+  productImage: string;
   stocks: number;
   reservedStocks: number;
   availableStocks: number;
+  category: number | null;
+  detailImages: ImageResponse[];
 };
 
 export type CategoryResponse = {
@@ -196,5 +200,5 @@ export type StockHistoryResponse = {
 export type ImageResponse = {
   productId: number;
   imageId: number;
-  imageUrl: string;
+  detailImage: string;
 };

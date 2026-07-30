@@ -5,8 +5,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import static org.springframework.transaction.support.TransactionSynchronization.STATUS_COMMITTED;
-
 @Component
 @RequiredArgsConstructor
 public class S3TransactionCleanup {

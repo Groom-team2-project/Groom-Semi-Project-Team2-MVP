@@ -54,8 +54,9 @@ public class S3imageStorage {
                     )
             );
             return objectKey;
-        } catch (IOException exception) {
-            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        } catch (IOException | RuntimeException exception) {
+            log.error("S3 이미지 업로드 실패: bucket={}, key={}", bucket, objectKey, exception);
+            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED, exception);
         }
     }
     public void delete(String objectkey) {

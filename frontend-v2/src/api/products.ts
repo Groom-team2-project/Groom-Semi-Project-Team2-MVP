@@ -36,23 +36,61 @@ export function createProduct(body: {
   productName: string;
   productPrice: number;
   stocks: number;
-  categoryId?: number | null;
-}) {
-  return api<{ productId: number }>('/api/v1/products', { method: 'POST', body, auth: true });
+  categoryId: number;
+}, productImage: File) {
+  const form = new FormData();
+  form.append('request', new Blob([JSON.stringify({
+    productName: body.productName,
+    productPrice: body.productPrice,
+    stock: body.stocks,
+    category: body.categoryId
+  })], { type: 'application/json' }));
+  form.append('productImage', productImage);
+  return api<unknown>('/api/v1/products', { method: 'POST', body: form, auth: true });
 }
 
-export function updateProduct(productId: number, body: { productName: string; productPrice: number }) {
-  return api<unknown>(`/api/v1/products/${productId}`, { method: 'PUT', body, auth: true });
+export function updateProduct(
+  productId: number,
+  body: { productName: string; productPrice: number; categoryId: number },
+  productImage?: File | null
+) {
+  const form = new FormData();
+  form.append('request', new Blob([JSON.stringify({
+    productName: body.productName,
+    productPrice: body.productPrice,
+    category: body.categoryId
+  })], { type: 'application/json' }));
+  if (productImage) form.append('productImage', productImage);
+  return api<unknown>(`/api/v1/products/${productId}`, { method: 'PUT', body: form, auth: true });
 }
 
 export function deleteProduct(productId: number) {
   return api<unknown>(`/api/v1/products/${productId}`, { method: 'DELETE', auth: true });
 }
 
-export function addProductImage(productId: number, imageUrl: string) {
+export function addProductImage(productId: number, image: File) {
+  const form = new FormData();
+  form.append('image', image);
   return api<ImageResponse>(`/api/v1/products/${productId}/images`, {
     method: 'POST',
-    body: { imageUrl },
+    body: form,
+    auth: true
+  });
+}
+
+export function updateProductImage(productId: number, imageId: number, image: File) {
+  const form = new FormData();
+  form.append('image', image);
+  return api<ImageResponse>(`/api/v1/products/${productId}/images/${imageId}`, {
+    method: 'PUT',
+    body: form,
+    auth: true
+  });
+}
+
+export function deleteProductImage(productId: number, imageId: number) {
+  return api<ImageResponse>(`/api/v1/products/${productId}/images/${imageId}`, {
+    method: 'DELETE',
     auth: true
   });
 }
