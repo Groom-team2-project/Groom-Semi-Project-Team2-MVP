@@ -222,7 +222,7 @@ export function AdminProductsPage() {
         productPrice: Number(price),
         stocks: Number(stocks),
         categoryId: Number(categoryId)
-      }, mainImage!),
+      }, mainImage),
     onSuccess: () => {
       invalidate();
       setName('');
@@ -296,7 +296,6 @@ export function AdminProductsPage() {
               if (!name.trim() || !price || !stocks || !categoryId) {
                 return toast('상품명·가격·재고·카테고리를 입력해주세요.', 'error');
               }
-              if (!mainImage) return toast('대표 이미지를 선택해주세요.', 'error');
               createMutation.mutate();
             }}
           >
@@ -326,10 +325,10 @@ export function AdminProductsPage() {
               {mainImagePreview && <img src={mainImagePreview} alt="선택한 대표 이미지 미리보기" />}
               <label
                 className="btn btn-ghost btn-sm has-tooltip"
-                data-tooltip="대표 이미지는 하나만 등록할 수 있어요."
-                title="대표 이미지는 하나만 등록할 수 있어요."
+                data-tooltip="대표 이미지는 선택 사항이며, 등록 후에도 변경할 수 있어요."
+                title="대표 이미지는 선택 사항이며, 등록 후에도 변경할 수 있어요."
               >
-                {mainImage ? '대표 이미지 변경' : '대표 이미지 선택'}
+                {mainImage ? '대표 이미지 변경' : '대표 이미지 선택 (선택)'}
                 <input
                   className="visually-hidden"
                   type="file"

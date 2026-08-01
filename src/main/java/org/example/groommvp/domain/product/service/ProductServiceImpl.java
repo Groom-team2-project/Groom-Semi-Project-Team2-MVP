@@ -49,8 +49,11 @@ public class ProductServiceImpl implements ProductService{
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_CATEGORY);
         }
 
-        String productImageKey = s3imageStorage.upload(productImage, "products/main");
-        s3TransactionCleanup.deleteAfterRollback(productImageKey);
+        String productImageKey = null;
+        if (productImage != null && !productImage.isEmpty()) {
+            productImageKey = s3imageStorage.upload(productImage, "products/main");
+            s3TransactionCleanup.deleteAfterRollback(productImageKey);
+        }
 
         ProductEntity product = ProductEntity.builder()
                 .productName(request.getProductName())

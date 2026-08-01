@@ -74,7 +74,7 @@ public class ProductController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommonResponse<ProductResponse>> createProduct(
             @Valid @RequestPart("request") ProductCreateRequest request,
-            @RequestPart("productImage") MultipartFile productImage) {
+            @RequestPart(value = "productImage", required = false) MultipartFile productImage) {
         ProductResponse response = productService.createProduct(request, productImage);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "상품 등록 성공"));
