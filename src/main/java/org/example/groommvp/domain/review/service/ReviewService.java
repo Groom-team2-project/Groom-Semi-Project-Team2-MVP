@@ -3,6 +3,7 @@ package org.example.groommvp.domain.review.service;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.order.entity.OrderStatus;
 import org.example.groommvp.domain.order.repository.OrderItemRepository;
+import org.example.groommvp.domain.review.dto.ReviewEligibilityResponse;
 import org.example.groommvp.domain.review.dto.ReviewRequest;
 import org.example.groommvp.domain.review.dto.ReviewResponse;
 import org.example.groommvp.domain.review.dto.ReviewUpdateRequest;
@@ -13,8 +14,12 @@ import org.example.groommvp.global.error.ErrorCode;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.example.groommvp.domain.member.entity.MemberEntity;
+import org.example.groommvp.domain.member.repository.MemberRepository;
 
+import java.util.Map;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,6 +27,7 @@ import java.util.stream.Collectors;
 public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final OrderItemRepository orderItemRepository;
+    private final MemberRepository memberRepository;
 
     @Transactional
     public ReviewResponse createReview(ReviewRequest reviewRequest, Long loginMemberId) {
@@ -49,24 +55,55 @@ public class ReviewService {
                 .build();
 
         try {
-            return ReviewResponse.from(reviewRepository.saveAndFlush(entity));
+            return toResponse(
+                    reviewRepository.saveAndFlush(entity)
+            );
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.REVIEW_ALREADY_EXISTS);
         }
     }
 
-    public List<ReviewResponse> getByProductId(Long productId) {
-        return reviewRepository.findByProductIdAndDeletedAtIsNull(productId)
-                .stream()
-                .map(ReviewResponse::from)
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public List<ReviewResponse> getByProductId(
+            Long productId
+    ) {
+        List<ReviewEntity> reviews =
+                reviewRepository
+                        .findByProductIdAndDeletedAtIsNull(
+                                productId
+                        );
+
+        List<Long> memberIds = reviews.stream()
+                .map(ReviewEntity::getMemberId)
+                .distinct()
+                .toList();
+
+        Map<Long, String> nicknameByMemberId =
+                memberRepository.findAllById(memberIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                MemberEntity::getMemberId,
+                                member -> maskNickname(
+                                        member.getNickname()
+                                )
+                        ));
+
+        return reviews.stream()
+                .map(review -> ReviewResponse.from(
+                        review,
+                        nicknameByMemberId.getOrDefault(
+                                review.getMemberId(),
+                                "익명**"
+                        )
+                ))
+                .toList();
     }
 
     public ReviewResponse getByReviewId(Long reviewId) {
         ReviewEntity entity = reviewRepository.findByReviewIdAndDeletedAtIsNull(reviewId)
                 .orElseThrow(() ->  new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
 
-        return ReviewResponse.from(entity);
+        return toResponse(entity);
     }
 
     @Transactional
@@ -78,7 +115,7 @@ public class ReviewService {
 
         entity.update(request.getContent(), request.getRating());
 
-        return ReviewResponse.from(entity);
+        return toResponse(entity);
     }
 
     @Transactional
@@ -91,9 +128,17 @@ public class ReviewService {
         entity.softDelete();
     }
 
-    private void validateReviewOwner(ReviewEntity review, Long loginMemberId) {
-        if (loginMemberId == null || !review.getMemberId().equals(loginMemberId)) {
-            throw new BusinessException(ErrorCode.REVIEW_FORBIDDEN);
+    private void validateReviewOwner(
+            ReviewEntity review,
+            Long loginMemberId
+    ) {
+        if (!Objects.equals(
+                review.getMemberId(),
+                loginMemberId
+        )) {
+            throw new BusinessException(
+                    ErrorCode.REVIEW_FORBIDDEN
+            );
         }
     }
 
@@ -112,5 +157,65 @@ public class ReviewService {
         if (!purchased) {
             throw new BusinessException(ErrorCode.REVIEW_PURCHASE_REQUIRED);
         }
+    }
+
+    // 로그인한 회원이 리뷰를 작성 할 수 있는지 확인한다.
+    public ReviewEligibilityResponse checkEligibility(Long loginMemberId, Long productId) {
+        if (loginMemberId == null) {
+            return ReviewEligibilityResponse.builder().eligible(false).build();
+        }
+
+        boolean purchased = orderItemRepository.existsByMemberIdAndProductIdAndOrderStatus(
+                loginMemberId, productId, OrderStatus.COMPLETED);
+        if (!purchased) {
+            return ReviewEligibilityResponse.builder().eligible(false).build();
+        }
+
+        boolean alreadyReviewed = reviewRepository.existsByProductIdAndMemberIdAndDeletedAtIsNull(
+                productId, loginMemberId);
+
+        return ReviewEligibilityResponse.builder().eligible(!alreadyReviewed).build();
+    }
+
+    private ReviewResponse toResponse(
+            ReviewEntity review
+    ) {
+        String writerNickname =
+                memberRepository
+                        .findById(review.getMemberId())
+                        .map(MemberEntity::getNickname)
+                        .map(this::maskNickname)
+                        .orElse("익명**");
+
+        return ReviewResponse.from(
+                review,
+                writerNickname
+        );
+    }
+
+    private String maskNickname(String nickname) {
+        if (
+                nickname == null ||
+                        nickname.isBlank()
+        ) {
+            return "익명**";
+        }
+
+        String trimmed = nickname.trim();
+
+        int visibleLength = Math.min(
+                2,
+                trimmed.codePointCount(
+                        0,
+                        trimmed.length()
+                )
+        );
+
+        int endIndex = trimmed.offsetByCodePoints(
+                0,
+                visibleLength
+        );
+
+        return trimmed.substring(0, endIndex) + "**";
     }
 }

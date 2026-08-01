@@ -164,10 +164,15 @@ export type RefundResponse = {
 };
 
 // ---------- review ----------
+export type ReviewEligibilityResponse = {
+  eligible: boolean;
+};
+
 export type ReviewResponse = {
   reviewId: number;
   productId: number;
   memberId: number;
+  writerNickname: string;
   content: string;
   rating: number;
   createdAt: string;
