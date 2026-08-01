@@ -53,7 +53,6 @@ export type ProductListItem = {
   viewCount: number;
   reservedStocks: number;
   availableStocks: number;
-  viewCount: number;
 };
 // 정렬
 export type ProductSortType = 'LATEST' | 'POPULAR' | 'VIEW_COUNT' | 'PRICE_ASC' | 'PRICE_DESC';
