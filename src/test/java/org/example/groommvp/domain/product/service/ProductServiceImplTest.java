@@ -82,6 +82,26 @@ class ProductServiceImplTest {
     }
 
     @Test
+    @DisplayName("대표 이미지 없이도 상품과 초기 재고를 등록할 수 있다")
+    void createProduct_withoutImage() {
+        CategoryEntity category = childCategory(2L);
+        ProductCreateRequest request = new ProductCreateRequest("이미지 없는 상품", 10_000, 10, 2L);
+        given(categoryRepository.findById(2L)).willReturn(Optional.of(category));
+        given(productRepository.save(any(ProductEntity.class))).willAnswer(invocation -> {
+            ProductEntity product = invocation.getArgument(0);
+            ReflectionTestUtils.setField(product, "productId", 1L);
+            return product;
+        });
+        given(stockRepository.save(any(StockEntity.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        ProductResponse response = productService.createProduct(request, null);
+
+        assertThat(response.getProductImage()).isNull();
+        verify(s3imageStorage, never()).upload(any(), any());
+        verify(s3TransactionCleanup, never()).deleteAfterRollback(any());
+    }
+
+    @Test
     @DisplayName("대분류에는 상품을 등록할 수 없고 이미지를 업로드하지 않는다")
     void createProduct_rejectsRootCategory() {
         ProductCreateRequest request = new ProductCreateRequest("노트북", 1000, 1, 1L);

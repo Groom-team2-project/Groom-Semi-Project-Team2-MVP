@@ -37,7 +37,7 @@ export function createProduct(body: {
   productPrice: number;
   stocks: number;
   categoryId: number;
-}, productImage: File) {
+}, productImage?: File | null) {
   const form = new FormData();
   form.append('request', new Blob([JSON.stringify({
     productName: body.productName,
@@ -45,7 +45,7 @@ export function createProduct(body: {
     stock: body.stocks,
     category: body.categoryId
   })], { type: 'application/json' }));
-  form.append('productImage', productImage);
+  if (productImage) form.append('productImage', productImage);
   return api<unknown>('/api/v1/products', { method: 'POST', body: form, auth: true });
 }
 
