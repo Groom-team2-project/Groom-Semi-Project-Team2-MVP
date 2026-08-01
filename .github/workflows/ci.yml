@@ -51,6 +51,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: CI env 파일 준비
+        run: cp .env.example .env
+
       - name: Docker compose 검증
         run: docker compose config
 
