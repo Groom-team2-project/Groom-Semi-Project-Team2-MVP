@@ -134,10 +134,11 @@ public class CartService {
         // 잡히고, 앞서 락을 쥐었던 트랜잭션이 만든 장바구니도 보인다.
         try {
             return cartRepository.findByMemberIdWithItems(memberId)
-                    .orElseGet(() -> cartRepository.save(CartEntity.init(member)));
+                    .orElseGet(() -> cartRepository.saveAndFlush(CartEntity.init(member)));
         } catch (DataIntegrityViolationException e) {
             // 위 직렬화가 어긋나 중복 생성이 시도된 경우의 마지막 안전망.
-            throw new BusinessException(ErrorCode.CART_BUSY);
+            // 원인을 함께 넘겨야 실제로 깨진 제약이 carts.member_id 유니크인지 다른 것인지 로그에서 가려낼 수 있다.
+            throw new BusinessException(ErrorCode.CART_BUSY, e);
         }
     }
 

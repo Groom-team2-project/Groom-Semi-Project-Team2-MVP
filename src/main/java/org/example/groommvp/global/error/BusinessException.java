@@ -26,4 +26,10 @@ public class BusinessException extends RuntimeException {
         super(detailMessage);
         this.errorCode = errorCode;
     }
+
+    /** 원인 예외를 보존하면서 공통 오류 코드로 변환할 때 사용한다. */
+    public BusinessException(ErrorCode errorCode, Throwable cause) {
+        super(errorCode.getMessage(), cause);
+        this.errorCode = errorCode;
+    }
 }

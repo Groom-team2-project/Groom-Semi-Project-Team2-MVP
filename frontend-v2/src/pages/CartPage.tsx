@@ -36,6 +36,8 @@ export function CartPage() {
     mutationFn: checkoutCart,
     onSuccess: (res) => {
       invalidate();
+      // 방금 만든 주문이 마이페이지 주문 내역에 바로 보이도록 함께 무효화한다.
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
       toast('주문이 생성되었어요. 결제를 진행해주세요.');
       navigate(`/orders/${res.orderId}`);
     },

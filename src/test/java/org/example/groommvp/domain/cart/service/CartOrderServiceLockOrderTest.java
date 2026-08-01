@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 
+import java.time.Duration;
 import java.util.Optional;
 import org.example.groommvp.domain.cart.entity.CartEntity;
 import org.example.groommvp.domain.cart.repository.CartRepository;
@@ -17,11 +18,11 @@ import org.example.groommvp.domain.stock.entity.StockEntity;
 import org.example.groommvp.domain.stock.entity.StockHistoryEntity;
 import org.example.groommvp.domain.stock.repository.StockHistoryRepository;
 import org.example.groommvp.domain.stock.repository.StockRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -58,8 +59,15 @@ class CartOrderServiceLockOrderTest {
     @Mock
     private OrderItemRepository orderItemRepository;
 
-    @InjectMocks
     private CartOrderService cartOrderService;
+
+    @BeforeEach
+    void setUp() {
+        // 결제 마감 시각은 설정값(Duration)이라 목이 아니다. @InjectMocks 는 이 자리에 null 을
+        // 넣어버리므로 직접 조립한다.
+        cartOrderService = new CartOrderService(cartRepository, stockRepository,
+                stockHistoryRepository, orderRepository, orderItemRepository, Duration.ofMinutes(30));
+    }
 
     private static MemberEntity member() {
         MemberEntity member = MemberEntity.createKakaoMember("kakao-1", "u@example.com", "회원");

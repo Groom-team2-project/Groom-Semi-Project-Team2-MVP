@@ -20,16 +20,22 @@ type Options = {
 
 async function rawRequest(path: string, options: Options): Promise<Response> {
   const headers: HeadersInit = {};
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isFormData = options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
   if (options.auth) {
     const token = tokenStore.getAccess();
     if (token) headers['Authorization'] = `Bearer ${token}`;
   }
+  const requestBody: BodyInit | undefined = options.body === undefined
+    ? undefined
+    : isFormData
+      ? options.body as FormData
+      : JSON.stringify(options.body);
   return fetch(path, {
     method: options.method ?? 'GET',
     headers,
     credentials: 'include',
-    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    body: requestBody
   });
 }
 

@@ -14,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.example.groommvp.domain.cart.config.CartCacheNames;
 import org.example.groommvp.domain.cart.dto.CartItemAddRequest;
 import org.example.groommvp.domain.cart.repository.CartItemRepository;
 import org.example.groommvp.domain.cart.repository.CartRepository;
@@ -40,10 +41,13 @@ import org.example.groommvp.domain.stock.repository.StockRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 /**
  * 파트 E(장바구니·쿠폰·포인트) 성능 측정.
@@ -55,10 +59,15 @@ import org.springframework.boot.test.context.SpringBootTest;
  * 의존하므로 임계값 단언은 최소로 두고, 결과는 표준 출력으로 남겨 사람이 비교하도록 한다.
  * 의미 있는 비교는 "같은 장비에서 수정 전/후" 또는 "캐시 히트 vs 미스" 처럼 상대값이다.
  *
+ * <p><b>기본 {@code test} 실행에서는 제외된다.</b> {@code @Tag("performance")} 가 붙어 있고
+ * build.gradle 이 이 태그를 기본으로 걸러내므로, 일상 빌드가 이 계측 때문에 느려지지 않는다.
+ * 돌리려면 {@code -PincludePerformance} 를 붙인다.
+ *
  * <p>실제 MySQL/Redis 로 재려면:
- * <pre>gradlew test --tests "*PartEPerformanceTest" -Dspring.profiles.active=mysql</pre>
+ * <pre>gradlew test -PincludePerformance --tests "*PartEPerformanceTest" -Dspring.profiles.active=mysql</pre>
  */
 @SpringBootTest
+@Tag("performance")
 @TestMethodOrder(org.junit.jupiter.api.MethodOrderer.OrderAnnotation.class)
 class PartEPerformanceTest {
 
@@ -117,6 +126,9 @@ class PartEPerformanceTest {
     @Autowired
     private MemberRepository memberRepository;
 
+    @Autowired
+    private CacheManager cacheManager;
+
     @AfterEach
     void tearDown() {
         stockHistoryRepository.deleteAllInBatch();
@@ -143,14 +155,29 @@ class PartEPerformanceTest {
         Long productId = newProduct("상품", 10_000).getProductId();
         cartService.addItem(memberId, new CartItemAddRequest(productId, 1));
 
-        // 캐시 미스: 매번 무효화해 DB 조회를 강제한다.
-        Result miss = measure("장바구니 조회 (캐시 미스)", () -> {
-            cartService.clearCart(memberId); // @CacheEvict — 다음 조회는 반드시 DB
-            cartService.getMyCart(memberId);
+        // 캐시 미스: 캐시 엔트리만 직접 걷어내 DB 조회를 강제한다.
+        //
+        // clearCart() 로 무효화하면 장바구니 항목이 실제로 지워져 "빈 장바구니 조회" 를 재게 되고,
+        // 쓰기 트랜잭션 비용까지 측정에 섞인다. 캐시 미스 경로만 재려면 데이터는 그대로 두고
+        // 캐시만 비워야 히트/미스 비교가 같은 대상에 대한 비교가 된다.
+        Cache cartCache = cacheManager.getCache(CartCacheNames.CART);
+        assertThat(cartCache).as("장바구니 캐시가 설정되어 있어야 미스/히트를 비교할 수 있다").isNotNull();
+
+        // 캐시 키(=회원)를 스레드마다 따로 준다. 한 회원을 32 스레드가 공유하면 A 가 비운 직후
+        // B 가 적재해 버려 나머지는 히트가 된다 — "미스" 를 잰다고 하고 실제로는 섞인 값을 잰다.
+        List<Long> missMemberIds = new ArrayList<>();
+        for (int i = 0; i < THREADS; i++) {
+            Long missMemberId = newMember("perf-cart-miss-" + i).getMemberId();
+            cartService.addItem(missMemberId, new CartItemAddRequest(productId, 1));
+            missMemberIds.add(missMemberId);
+        }
+        Result miss = measurePerThread("장바구니 조회 (캐시 미스)", threadIndex -> {
+            Long missMemberId = missMemberIds.get(threadIndex % missMemberIds.size());
+            cartCache.evict(missMemberId);
+            cartService.getMyCart(missMemberId);
             return null;
         });
 
-        cartService.addItem(memberId, new CartItemAddRequest(productId, 1));
         cartService.getMyCart(memberId); // 캐시 적재
         Result hit = measure("장바구니 조회 (캐시 히트)", () -> cartService.getMyCart(memberId));
 

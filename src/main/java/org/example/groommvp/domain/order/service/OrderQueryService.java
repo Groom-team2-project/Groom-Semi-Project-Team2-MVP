@@ -32,7 +32,7 @@ public class OrderQueryService {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
 
-        List<Order> orders = orderRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
+        List<Order> orders = orderRepository.findByMemberIdOrderByCreatedAtDescIdDesc(memberId);
         if (orders.isEmpty()) {
             return List.of();
         }

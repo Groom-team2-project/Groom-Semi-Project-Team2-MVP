@@ -7,16 +7,15 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import org.example.groommvp.global.response.SwaggerResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.product.dto.*;
 import org.example.groommvp.domain.product.service.ProductService;
 import org.example.groommvp.global.response.CommonResponse;
 import org.example.groommvp.global.response.ErrorResponse;
-import org.example.groommvp.global.response.SwaggerResponse;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +23,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Product", description = "상품 관리 API")
 @RestController
@@ -71,10 +71,11 @@ public class ProductController {
                                     }
                                     """)))
     })
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommonResponse<ProductResponse>> createProduct(
-            @Valid @RequestBody ProductCreateRequest request) {
-        ProductResponse response = productService.createProduct(request);
+            @Valid @RequestPart("request") ProductCreateRequest request,
+            @RequestPart(value = "productImage", required = false) MultipartFile productImage) {
+        ProductResponse response = productService.createProduct(request, productImage);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "상품 등록 성공"));
     }
@@ -175,12 +176,13 @@ public class ProductController {
                                     }
                                     """)))
     })
-    @PutMapping("/{productId}")
+    @PutMapping(value = "/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CommonResponse<ProductResponse>> updateProduct(
             @Parameter(description = "상품 ID", example = "1", required = true)
             @PathVariable Long productId,
-            @Valid @RequestBody ProductUpdateRequest request) {
-        ProductResponse response = productService.updateProduct(productId, request);
+            @Valid @RequestPart("request") ProductUpdateRequest request,
+            @RequestPart(value = "productImage", required = false) MultipartFile productImage) {
+        ProductResponse response = productService.updateProduct(productId, request, productImage);
         return ResponseEntity.ok(CommonResponse.success(response, "상품 수정 성공"));
     }
 
@@ -291,10 +293,15 @@ public class ProductController {
             @Parameter(description = "페이지 크기", example = "10")
             @RequestParam(defaultValue = "10") int size,
             @Parameter(description = "상품명 검색 키워드 (선택)")
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @Parameter(description = "카테고리 ID로 필터링 (선택)")
+            @RequestParam(required = false) Long categoryId,
+            @Parameter(description = "정렬 기준 (선택, 기본값 latest): latest, popular, view_count, price_asc, price_desc")
+            @RequestParam(required = false) String sort
     ){
-        Pageable pageable = PageRequest.of(page, size);
-        Page<ProductListResponse> productPage = productService.getProductList(keyword, pageable);
+        ProductSortType sortType = ProductSortType.from(sort);
+        Page<ProductListResponse> productPage =
+                productService.getProductList(keyword, categoryId, sortType, page, size);
 
         PageResponse<ProductListResponse> pageData = PageResponse.from(productPage);
 

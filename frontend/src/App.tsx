@@ -399,11 +399,14 @@ export default function App() {
 
   function saveToken(nextToken: string) {
     if (activeTokenRef.current !== nextToken) {
+      // 계정이 바뀌면 이전 회원의 데이터는 화면에서 즉시 지운다.
+      // 새 응답이 도착할 때까지 남겨두면 남의 장바구니·주문이 잠시 노출된다.
       setMember(null);
       setOrderHistory([]);
       setOrderDetail(null);
       setOrderId('');
       setCart(null);
+      setMyOrders(null);
     }
 
     activeTokenRef.current = nextToken;
@@ -418,6 +421,8 @@ export default function App() {
     setOrderHistory([]);
     setOrderDetail(null);
     setOrderId('');
+    setCart(null);
+    setMyOrders(null);
     localStorage.removeItem(TOKEN_KEY);
     setNotice('로그아웃되었습니다.');
   }
@@ -690,7 +695,13 @@ export default function App() {
       return;
     }
 
-    const result = await run<OrderDetail>('주문 조회', 'GET', `/api/v1/orders/${nextOrderId}`, undefined, true);
+    const requestToken = token;
+    const result = await run<OrderDetail>('주문 조회', 'GET', `/api/v1/orders/${nextOrderId}`,
+      undefined, true, requestToken || undefined);
+    // 늦게 도착한 이전 회원의 주문이 새 계정 화면을 덮어쓰지 않도록 막는다.
+    if (activeTokenRef.current !== requestToken) {
+      return;
+    }
     const data = unwrapData<OrderDetail>(result);
 
     if (data) {
@@ -807,7 +818,14 @@ export default function App() {
     }
   }
   async function getCart() {
-    applyCart(await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true));
+    const requestToken = token;
+    const res = await run('장바구니 조회', 'GET', '/api/v1/carts', undefined, true,
+      requestToken || undefined);
+    // 응답이 도착하기 전에 계정이 바뀌었다면 버린다. (개인 조회는 모두 같은 가드를 쓴다)
+    if (activeTokenRef.current !== requestToken) {
+      return;
+    }
+    applyCart(res);
   }
   async function addCartItem() {
     applyCart(await run('장바구니 담기', 'POST', '/api/v1/carts/items', {
@@ -830,6 +848,9 @@ export default function App() {
       const data = unwrapData(res);
       const nextOrderId = getNested<number>(data, 'orderId');
       setCart({ cartId: null, items: [], totalQuantity: 0, totalPrice: 0 });
+      // 방금 만든 주문이 마이페이지 주문 내역에 바로 보이도록 여기서 갱신한다.
+      // (마이페이지 재진입 시에도 다시 불러오지만, 그때까지 낡은 목록을 들고 있지 않게 한다)
+      void getMyOrders();
       if (nextOrderId) {
         // 체크아웃 후에는 결제 흐름을 이어가도록 주문 상세로 이동한다.
         setOrderId(String(nextOrderId));
@@ -859,7 +880,14 @@ export default function App() {
   // ===== E 파트: 주문 내역 (서버 조회) =====
   // 로컬에 쌓는 orderHistory 와 달리 서버가 원본이라, 기기·브라우저가 달라도 동일하게 보인다.
   async function getMyOrders() {
-    const res = await run('내 주문 내역', 'GET', '/api/v1/members/me/orders', undefined, true);
+    const requestToken = token;
+    const res = await run('내 주문 내역', 'GET', '/api/v1/members/me/orders', undefined, true,
+      requestToken || undefined);
+    // 응답이 도착하기 전에 계정이 바뀌었다면 버린다. (loadMe 와 같은 가드)
+    // 이 가드가 없으면 늦게 도착한 이전 회원의 주문이 새 계정 화면에 그려진다.
+    if (activeTokenRef.current !== requestToken) {
+      return;
+    }
     if (res.ok) {
       setMyOrders(unwrapData<OrderDetail[]>(res) ?? []);
     }
@@ -1247,16 +1275,19 @@ export default function App() {
                           <span className="cart-item-controls">
                             <button
                               type="button"
+                              aria-label={`${item.productName ?? '상품'} 수량 1개 줄이기`}
                               onClick={() => changeCartItemQuantity(item, -1)}
                               disabled={isLoading || (item.quantity ?? 1) <= 1}
                             >-</button>
                             <button
                               type="button"
+                              aria-label={`${item.productName ?? '상품'} 수량 1개 늘리기`}
                               onClick={() => changeCartItemQuantity(item, 1)}
                               disabled={isLoading}
                             >+</button>
                             <button
                               type="button"
+                              aria-label={`${item.productName ?? '상품'} 장바구니에서 삭제`}
                               onClick={() => removeCartItemById(item.cartItemId)}
                               disabled={isLoading}
                             >삭제</button>

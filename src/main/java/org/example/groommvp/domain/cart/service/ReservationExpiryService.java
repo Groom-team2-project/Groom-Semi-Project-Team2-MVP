@@ -53,13 +53,16 @@ public class ReservationExpiryService {
     /**
      * 회수 대상 주문 ID를 오래된 순으로 찾는다.
      *
-     * @param threshold 이 시각 이전에 생성된 미결제 주문이 대상
-     * @param batchSize 한 번에 가져올 최대 건수
+     * <p>주문에 적힌 결제 마감 시각이 기준이다. 마감 시각이 없는 옛 주문만 생성 시각으로 판정한다.
+     *
+     * @param legacyThreshold 마감 시각이 없는 옛 주문용 기준 — 이 시각 이전 생성분이 대상
+     * @param batchSize       한 번에 가져올 최대 건수
      */
     @Transactional(readOnly = true)
-    public List<Long> findExpiredOrderIds(LocalDateTime threshold, int batchSize) {
-        return orderRepository.findIdsByStatusCreatedBefore(
-                OrderStatus.PENDING_PAYMENT, threshold, PageRequest.of(0, batchSize));
+    public List<Long> findExpiredOrderIds(LocalDateTime legacyThreshold, int batchSize) {
+        return orderRepository.findIdsByStatusExpiredBefore(
+                OrderStatus.PENDING_PAYMENT, LocalDateTime.now(), legacyThreshold,
+                PageRequest.of(0, batchSize));
     }
 
     /**

@@ -19,8 +19,8 @@ repositories {
 }
 
 dependencies {
-    //implementation platform('software.amazon.awssdk:bom:<검증된 버전>')
-    //implementation 'software.amazon.awssdk:s3'
+    implementation platform('software.amazon.awssdk:bom:2.31.78')
+    implementation 'software.amazon.awssdk:s3'
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -50,7 +50,16 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    // 성능 측정(@Tag("performance"))은 32스레드 × 수십 반복으로 DB 를 두드리는 계측이라
+    // 회귀 테스트가 아니다. 일상 빌드를 느리게 만들지 않도록 기본 실행에서 제외하고,
+    // 필요할 때만 -PincludePerformance 로 켠다.
+    //   gradlew test -PincludePerformance --tests "*PartEPerformanceTest" -Dspring.profiles.active=mysql
+    def includePerformance = project.hasProperty('includePerformance')
+    useJUnitPlatform {
+        if (!includePerformance) {
+            excludeTags 'performance'
+        }
+    }
 
     def activeProfile = System.getProperty('spring.profiles.active')
     if (activeProfile != null) {

@@ -86,6 +86,8 @@ log/
 tmp/
 temp/
 outputs/
+performance/results/*
+!performance/results/.gitkeep
 
 # ========================
 # Spring Boot 관련
@@ -114,6 +116,15 @@ frontend-v2/node_modules/
 frontend-v2/dist/
 frontend-v2/.vite/
 frontend-v2/*.tsbuildinfo
+
+# frontend-v3
+frontend-v3/node_modules/
+frontend-v3/dist/
+frontend-v3/.vite/
+frontend-v3/.env
+frontend-v3/.env.*
+!frontend-v3/.env.example
+frontend-v3/*.tsbuildinfo
 
 # 로컬 개발 도구 설정
 .claude/

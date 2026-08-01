@@ -11,6 +11,7 @@ import org.example.groommvp.domain.order.repository.OrderItemRepository;
 import org.example.groommvp.domain.review.dto.ReviewRequest;
 import org.example.groommvp.domain.review.entity.ReviewEntity;
 import org.example.groommvp.domain.review.repository.ReviewRepository;
+import org.example.groommvp.domain.member.repository.MemberRepository;
 import org.example.groommvp.global.error.BusinessException;
 import org.example.groommvp.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,9 @@ class ReviewServiceTest {
 
     @Mock
     private OrderItemRepository orderItemRepository;
+
+    @Mock
+    private MemberRepository SmemberRepository;
 
     @InjectMocks
     private ReviewService reviewService;

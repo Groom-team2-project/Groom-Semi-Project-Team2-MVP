@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.groommvp.domain.auth.security.AuthMember;
+import org.example.groommvp.domain.review.dto.ReviewEligibilityResponse;
 import org.example.groommvp.domain.review.dto.ReviewRequest;
 import org.example.groommvp.domain.review.dto.ReviewResponse;
 import org.example.groommvp.domain.review.dto.ReviewUpdateRequest;
@@ -41,6 +42,25 @@ public class ReviewController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(CommonResponse.success(response, "리뷰 등록 성공"));
+    }
+
+    @Operation(
+            summary = "리뷰 작성 자격 확인",
+            description = "로그인한 회원이 이 상품에 리뷰를 새로 작성할 수 있는 상태인지 확인합니다. " +
+                    "비로그인/미구매/이미 리뷰 작성 상태면 eligible=false 로 응답합니다."
+    )
+    @GetMapping("/products/{productId}/reviews/eligibility")
+    public ResponseEntity<CommonResponse<ReviewEligibilityResponse>> getReviewEligibility(
+            @AuthenticationPrincipal AuthMember authMember,
+            @Parameter(description = "상품 ID", example = "1")
+            @PathVariable Long productId
+    ) {
+        Long loginMemberId = authMember != null ? authMember.memberId() : null;
+        ReviewEligibilityResponse response = reviewService.checkEligibility(loginMemberId, productId);
+
+        return ResponseEntity.ok(
+                CommonResponse.success(response, "리뷰 작성 자격 확인 성공")
+        );
     }
 
     @Operation(

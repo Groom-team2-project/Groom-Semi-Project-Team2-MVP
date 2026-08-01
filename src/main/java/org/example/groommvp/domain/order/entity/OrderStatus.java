@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "주문 상태")
 public enum OrderStatus {
     PENDING_PAYMENT, // 주문은 생성되었으나, 결제는 하지 않은 상태
+    PAYMENT_PROCESSING, // 토스 승인 결과를 기다리는 중
     COMPLETED, // 결제 성공 후 주문이 완료된 상태
     CANCELED, // 사용자가 취소한 상태
     PAYMENT_FAILED; // 결제 시도는 했지만 실패한 상태
@@ -27,5 +28,10 @@ public enum OrderStatus {
     // 결제까지 완료된 주문인지 확인
     public boolean isCompleted() {
         return this == COMPLETED;
+    }
+
+    // 토스 승인 결과를 기다리는 중인지 확인 (만료 스케줄러의 처리 대상이 아니다)
+    public boolean isPaymentProcessing() {
+        return this == PAYMENT_PROCESSING;
     }
 }

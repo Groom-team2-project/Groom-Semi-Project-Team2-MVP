@@ -120,16 +120,21 @@ class ReservationExpiryServiceTest {
     }
 
     /**
-     * 오래된 주문을 흉내내기 위해 생성 시각을 과거로 되돌린다.
+     * 오래된 주문을 흉내내기 위해 생성 시각과 결제 마감 시각을 함께 과거로 되돌린다.
      *
      * <p>{@code created_at} 은 {@code @Column(updatable = false)} 라 엔티티를 고쳐 저장해도
      * UPDATE 문에 포함되지 않는다. (감사 필드라 의도된 동작) 그래서 네이티브 쿼리로 직접 바꾼다.
+     *
+     * <p>회수 판정 기준이 {@code payment_expires_at} 이므로 생성 시각만 되돌리면 만료되지 않는다.
+     * 실제로도 두 값은 함께 움직이므로(마감 = 생성 + 유예) 여기서도 같이 옮긴다.
      */
     private void ageOrder(Long orderId, LocalDateTime createdAt) {
         transactionTemplate.executeWithoutResult(status ->
                 entityManager.createNativeQuery(
-                                "update orders set created_at = :createdAt where order_id = :orderId")
+                                "update orders set created_at = :createdAt, "
+                                        + "payment_expires_at = :expiresAt where order_id = :orderId")
                         .setParameter("createdAt", createdAt)
+                        .setParameter("expiresAt", createdAt.plusMinutes(30))
                         .setParameter("orderId", orderId)
                         .executeUpdate());
     }
@@ -157,7 +162,8 @@ class ReservationExpiryServiceTest {
     void releaseReservation_skipsPaidOrder() {
         Long orderId = checkoutWithQuantity(3);
         Order order = orderRepository.findById(orderId).orElseThrow();
-        order.completePayment();
+        order.startPayment();      // 승인 요청 → PAYMENT_PROCESSING
+        order.completePayment();   // 승인 성공 → COMPLETED
         orderRepository.saveAndFlush(order);
 
         boolean released = reservationExpiryService.releaseReservation(orderId);
@@ -170,6 +176,31 @@ class ReservationExpiryServiceTest {
     }
 
     @Test
+    @DisplayName("승인 요청 중인 주문(PAYMENT_PROCESSING)은 만료 대상에서 제외된다")
+    void releaseReservation_skipsPaymentProcessingOrder() {
+        // given: 사용자가 결제 버튼을 눌러 토스 승인 요청이 나간 상태
+        Long orderId = checkoutWithQuantity(3);
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        order.startPayment();
+        orderRepository.saveAndFlush(order);
+        // 만료 시각이 지나도록 오래된 주문으로 만든다
+        ageOrder(orderId, LocalDateTime.now().minusHours(2));
+
+        // when: 그사이 만료 스케줄러가 돌았다
+        List<Long> expired = reservationExpiryService.findExpiredOrderIds(
+                LocalDateTime.now().minusMinutes(30), 100);
+        boolean released = reservationExpiryService.releaseReservation(orderId);
+
+        // then: 승인 중인 주문은 조회 대상도 아니고, 직접 호출해도 회수되지 않아야 한다.
+        //       그래야 "토스는 결제 성공, 주문은 취소"가 되는 상황을 막을 수 있다.
+        assertThat(expired).doesNotContain(orderId);
+        assertThat(released).isFalse();
+        assertThat(reloadStock().getAvailableStocks()).isEqualTo(INITIAL_STOCK - 3);  // 예약 유지
+        assertThat(orderRepository.findById(orderId).orElseThrow().getStatus())
+                .isEqualTo(OrderStatus.PAYMENT_PROCESSING);
+    }
+
+    @Test
     @DisplayName("이미 회수된 주문을 다시 회수해도 재고가 두 번 풀리지 않는다 (멱등)")
     void releaseReservation_isIdempotent() {
         Long orderId = checkoutWithQuantity(3);
@@ -179,6 +210,46 @@ class ReservationExpiryServiceTest {
 
         assertThat(releasedAgain).isFalse();
         assertThat(reloadStock().getAvailableStocks()).isEqualTo(INITIAL_STOCK);
+    }
+
+    /** 마감 시각만 따로 바꾼다. (생성 시각은 그대로 두어 "무엇으로 판정하는지"를 가른다) */
+    private void setPaymentExpiresAt(Long orderId, LocalDateTime expiresAt) {
+        transactionTemplate.executeWithoutResult(status ->
+                entityManager.createNativeQuery(
+                                "update orders set payment_expires_at = :expiresAt where order_id = :orderId")
+                        .setParameter("expiresAt", expiresAt)
+                        .setParameter("orderId", orderId)
+                        .executeUpdate());
+    }
+
+    @Test
+    @DisplayName("생성된 지 얼마 안 됐어도 결제 마감이 지났으면 회수 대상이다")
+    void findExpiredOrderIds_usesPaymentExpiresAtNotCreatedAt() {
+        // 방금 만든 주문이지만 마감 시각만 과거로 당긴다.
+        // (짧은 마감을 준 주문이 스케줄러 설정 때문에 늦게 회수되면, 화면에 띄운 마감과 어긋난다)
+        Long orderId = checkoutWithQuantity(1);
+        setPaymentExpiresAt(orderId, LocalDateTime.now().minusMinutes(1));
+
+        List<Long> expired = reservationExpiryService.findExpiredOrderIds(
+                LocalDateTime.now().minusMinutes(30), 100);
+
+        assertThat(expired).contains(orderId);
+    }
+
+    @Test
+    @DisplayName("마감 시각이 없는 옛 주문은 생성 시각으로 판정한다")
+    void findExpiredOrderIds_fallsBackToCreatedAtWhenExpiresAtIsNull() {
+        Long oldOrderId = checkoutWithQuantity(1);
+        ageOrder(oldOrderId, LocalDateTime.now().minusHours(2));
+        setPaymentExpiresAt(oldOrderId, null);
+
+        Long freshOrderId = checkoutWithQuantity(1);
+        setPaymentExpiresAt(freshOrderId, null);
+
+        List<Long> expired = reservationExpiryService.findExpiredOrderIds(
+                LocalDateTime.now().minusMinutes(30), 100);
+
+        assertThat(expired).contains(oldOrderId).doesNotContain(freshOrderId);
     }
 
     @Test
@@ -205,6 +276,22 @@ class ReservationExpiryServiceTest {
                 LocalDateTime.now().minusMinutes(30), 2);
 
         assertThat(expired).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("체크아웃한 주문에는 결제 마감 시각이 박힌다 (단건 구매와 동일)")
+    void checkout_setsPaymentExpiresAt() {
+        LocalDateTime before = LocalDateTime.now();
+
+        Long orderId = checkoutWithQuantity(1);
+
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        // 비워두면 응답을 받는 쪽이 "마감 없는 주문" 으로 오해한다. 회수 스케줄러와 같은
+        // 설정값(기본 30분)에서 나오므로 그 범위 안에 들어와야 한다.
+        assertThat(order.getPaymentExpiresAt())
+                .isNotNull()
+                .isAfter(before)
+                .isBefore(LocalDateTime.now().plusMinutes(31));
     }
 
     @Test
