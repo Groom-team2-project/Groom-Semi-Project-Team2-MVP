@@ -53,7 +53,6 @@ export type ProductListItem = {
   viewCount: number;
   reservedStocks: number;
   availableStocks: number;
-  viewCount: number;
 };
 // 정렬
 export type ProductSortType = 'LATEST' | 'POPULAR' | 'VIEW_COUNT' | 'PRICE_ASC' | 'PRICE_DESC';
@@ -165,10 +164,15 @@ export type RefundResponse = {
 };
 
 // ---------- review ----------
+export type ReviewEligibilityResponse = {
+  eligible: boolean;
+};
+
 export type ReviewResponse = {
   reviewId: number;
   productId: number;
   memberId: number;
+  writerNickname: string;
   content: string;
   rating: number;
   createdAt: string;
