@@ -64,6 +64,11 @@ jobs:
       - name: Docker compose 검증
         run: docker compose config
 
+      - name: Production Docker compose validation
+        run: |
+          APP_ENV_FILE=deploy/.env.example \
+          docker compose --env-file deploy/.env.example -f docker-compose.prod.yml config --quiet
+
   docker-build:
     runs-on: ubuntu-latest
     needs: [ backend, frontend-v2, docker-compose ]
